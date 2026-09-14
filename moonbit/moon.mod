@@ -1,4 +1,4 @@
-name = "folotoy/ai-passport-password"
+name = "folotoy/strong-password-generator-ai-passport"
 
 version = "0.1.0"
 
@@ -8,4 +8,4 @@ preferred_target = "native"
 
 supported_targets = "native"
 
-description = "Offline password generator core for FoloToy AI Passport"
+description = "MoonBit core for Strong Password Generator_AI Passport"

@@ -21,6 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      - name: Install MoonBit 0.1.20260904
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh \
+            | bash -s 0.1.20260904
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
       - name: Install verified actionlint
         run: |
           actionlint_bin="$(./tools/install-actionlint.sh "$RUNNER_TEMP/actionlint")"

@@ -38,7 +38,12 @@ jobs:
           extra_docker_args: >-
             -e CCACHE_DIR=/app/${{ github.repository }}/.ccache
             -e IDF_CCACHE_ENABLE=1
-          command: ./tools/validate.sh --firmware
+          command: >-
+            curl -fsSL https://cli.moonbitlang.com/install/unix.sh
+            | bash -s 0.1.20260904
+            && export PATH="$HOME/.moon/bin:$PATH"
+            && moon version --all
+            && ./tools/validate.sh --firmware
 
       - name: Set artifact name
         id: artifact_name

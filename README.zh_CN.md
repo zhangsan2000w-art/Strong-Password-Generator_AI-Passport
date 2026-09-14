@@ -22,6 +22,8 @@
 
 本次验证环境使用 `moon 0.1.20260904` 和 `moonc v0.10.12+1634b282e`。ESP-IDF 构建会调用 [`tools/generate_moonbit.py`](tools/generate_moonbit.py)，将 MoonBit 包编译为可移植 C，再链接到 `moonbit_password` ESP-IDF 组件。生成的 C 是构建产物，不进入 Git。
 
+GitHub Actions 安装 MoonBit 的 `latest` 稳定通道，因为官方 CDN 不保证带日期的 CLI 历史包长期可下载。每次 CI 日志打印的实际工具版本即为该次验证记录；上面的版本仍是本地已经验证的开发快照。
+
 ## 测试
 
 运行完整静态检查和主机测试：

@@ -49,7 +49,7 @@ jobs:
             -e IDF_CCACHE_ENABLE=1
           command: >-
             curl -fsSL https://cli.moonbitlang.com/install/unix.sh
-            | bash -s 0.1.20260904
+            | bash -s latest
             && export PATH="$HOME/.moon/bin:$PATH"
             && moon version --all
             && ./tools/validate.sh --firmware

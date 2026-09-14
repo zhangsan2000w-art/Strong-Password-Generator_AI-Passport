@@ -22,6 +22,8 @@ The firmware starts directly in the generator. It does not connect to a network,
 
 The verified development snapshot used `moon 0.1.20260904` and `moonc v0.10.12+1634b282e`. The ESP-IDF build invokes [`tools/generate_moonbit.py`](tools/generate_moonbit.py), which compiles the MoonBit package to portable C and links it into the `moonbit_password` ESP-IDF component. Generated C is a build artifact and is not committed.
 
+GitHub Actions installs MoonBit's `latest` stable channel because dated CLI bundles are not guaranteed to remain downloadable from the official CDN. The exact tool versions printed by each CI run are therefore part of that run's verification record; the version above remains the locally verified snapshot.
+
 ## Test
 
 Run the full static and host-test gate:

@@ -115,6 +115,8 @@ LICENSE                  Repository license
 
 Repository documentation is organized by function area. `authoritative` documents define development or collaboration requirements; `reference` documents provide background or an index.
 
+- [`docs/application/ARCHITECTURE.md`](application/ARCHITECTURE.md), [`SECURITY.md`](application/SECURITY.md), and [`AI_USAGE.md`](application/AI_USAGE.md) — architecture, security boundaries, decision records, and AI assistance disclosure for the **Strong Password Generator_AI Passport** fork application.
+
 - [`docs/development/`](development/README.md) — engineering rules and reusable workflows: the `ai-guide.md`, `engineering/`, `ci/`, and `release/` areas. Its README lists them.
 - [`docs/contribution/`](contribution/README.md) — collaboration, documentation, and commit/PR conventions.
 - [`docs/hardware-design/`](hardware-design/README.md) — board facts, constraints, acceptance matrix, and troubleshooting.

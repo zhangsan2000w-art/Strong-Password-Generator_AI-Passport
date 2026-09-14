@@ -113,6 +113,8 @@ LICENSE                  仓库许可证
 
 本仓库文档按功能域组织。`authoritative` 指对开发与协作有约束力的文档；`参考` 指提供背景或索引的文档。
 
+- [`docs/application/ARCHITECTURE.zh_CN.md`](application/ARCHITECTURE.zh_CN.md)、[`SECURITY.zh_CN.md`](application/SECURITY.zh_CN.md) 与 [`AI_USAGE.zh_CN.md`](application/AI_USAGE.zh_CN.md) — **Strong Password Generator_AI Passport** fork 应用的架构、安全边界、决策记录与 AI 协助说明。
+
 - [`docs/development/`](development/README.zh_CN.md) — 工程规则与可复用工作流：`ai-guide.md`、`engineering/`、`ci/`、`release/` 区。其 README 列明它们。
 - [`docs/contribution/`](contribution/README.zh_CN.md) — 协作、文档与提交/PR 约定。
 - [`docs/hardware-design/`](hardware-design/README.zh_CN.md) — 板卡事实、约束、验收矩阵与排障。

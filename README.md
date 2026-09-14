@@ -88,6 +88,7 @@ Alternatively, use the official AI Passport web flasher and select the same `-fu
 - The memorable mode bundles the 1,296-entry [EFF Short Wordlist for Passphrases #1](https://www.eff.org/files/2016/09/08/eff_short_wordlist_1.txt), attributed to the Electronic Frontier Foundation under CC BY 3.0 US. The tracked source SHA-256 is `8f5ca830b8bffb6fe39c9736c024a00a6a6411adb3f83a9be8bfeeb6e067ae69`.
 - Build-time code generation packs all words into one NUL-separated constant byte blob with 16-bit offsets. The table remains in Flash and is not loaded wholesale into RAM at startup.
 - The Chinese LVGL glyph subset was generated from Noto Sans SC. Its OFL 1.1 notice is tracked at [`assets/fonts/NotoSansSC-OFL.txt`](assets/fonts/NotoSansSC-OFL.txt). Only ASCII and V1 UI glyphs are compiled into the firmware.
+- The subset uses LVGL's compressed font format, so `sdkconfig.defaults` enables `CONFIG_LV_USE_FONT_COMPRESSED=y`. If panels and the generated password render but title, mode, and button labels are blank, rebuild from clean defaults and confirm this option is present in the generated `sdkconfig`.
 - The vendored MoonBit runtime files retain their Apache-2.0 notice in [`components/moonbit_password/RUNTIME_LICENSE.txt`](components/moonbit_password/RUNTIME_LICENSE.txt). Project-authored code remains under the repository MIT license.
 
 ## Design and security
@@ -99,4 +100,4 @@ Alternatively, use the official AI Passport web flasher and select the same `-fu
 
 ## Verification status
 
-Host MoonBit tests and a complete ESP-IDF firmware build have passed in the development environment. Physical-device validation has not yet been performed and must be reported separately.
+Host MoonBit tests and a complete ESP-IDF firmware build have passed in the development environment. A physical-device run confirmed display layout and PIN generation but exposed blank custom-font labels in an earlier image. Compressed-font support is now enabled and build-verified; the corrected image still requires a fresh device flash before the font fix can be marked device-verified.

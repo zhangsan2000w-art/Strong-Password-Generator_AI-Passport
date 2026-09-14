@@ -88,6 +88,7 @@ python -m esptool --chip esp32c3 --baud 460800 \
 - 易记模式内置 Electronic Frontier Foundation 的 1,296 词 [EFF Short Wordlist for Passphrases #1](https://www.eff.org/files/2016/09/08/eff_short_wordlist_1.txt)，按 CC BY 3.0 US 署名使用。仓库内源文件 SHA-256 为 `8f5ca830b8bffb6fe39c9736c024a00a6a6411adb3f83a9be8bfeeb6e067ae69`。
 - 构建时代码生成器将单词打包为一个以 NUL 分隔的常量字节块和 16 位偏移表。数据保留在 Flash 中，启动时不会整体加载进 RAM。
 - 中文 LVGL 字形子集由 Noto Sans SC 生成，OFL 1.1 声明位于 [`assets/fonts/NotoSansSC-OFL.txt`](assets/fonts/NotoSansSC-OFL.txt)。固件仅编入 ASCII 和 V1 界面需要的中文字形。
+- 字形子集使用 LVGL 压缩字体格式，因此 `sdkconfig.defaults` 启用 `CONFIG_LV_USE_FONT_COMPRESSED=y`。如果面板和生成结果正常，但标题、模式与按钮文字为空白，请按默认配置重新构建，并确认生成的 `sdkconfig` 包含该选项。
 - 随固件编译的 MoonBit runtime 文件保留 Apache-2.0 声明，见 [`components/moonbit_password/RUNTIME_LICENSE.txt`](components/moonbit_password/RUNTIME_LICENSE.txt)。项目自有代码沿用仓库 MIT License。
 
 ## 设计与安全
@@ -99,4 +100,4 @@ python -m esptool --chip esp32c3 --baud 460800 \
 
 ## 验证状态
 
-MoonBit 主机测试和完整 ESP-IDF 固件构建已在开发环境通过。尚未执行真机验证，必须单独记录。
+MoonBit 主机测试和完整 ESP-IDF 固件构建已在开发环境通过。一次真机运行已确认界面布局和 PIN 生成，同时发现旧镜像的自定义字体标签为空白。压缩字体支持现已启用并通过构建验证；修复后的镜像仍需重新烧录，才能把字体修复标记为真机验证通过。

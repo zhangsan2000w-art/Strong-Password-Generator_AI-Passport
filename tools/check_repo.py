@@ -193,6 +193,24 @@ def check_conflict_markers(files: list[Path], errors: list[str]) -> None:
             errors.append(f"{path.relative_to(ROOT)}: unresolved merge conflict marker")
 
 
+def check_font_configuration(errors: list[str]) -> None:
+    """Keep generated compressed fonts renderable in LVGL firmware builds."""
+    font_path = ROOT / "main" / "passport_font_zh_16.c"
+    config_path = ROOT / "sdkconfig.defaults"
+    if not font_path.is_file() or not config_path.is_file():
+        return
+
+    font_source = font_path.read_text(encoding="utf-8")
+    config = config_path.read_text(encoding="utf-8")
+    if ".bitmap_format = 1" in font_source and not re.search(
+        r"(?m)^CONFIG_LV_USE_FONT_COMPRESSED=y$", config
+    ):
+        errors.append(
+            "sdkconfig.defaults: compressed passport font requires "
+            "CONFIG_LV_USE_FONT_COMPRESSED=y"
+        )
+
+
 def main() -> int:
     errors: list[str] = []
     files = text_files()
@@ -203,6 +221,7 @@ def main() -> int:
     check_issue_forms(errors)
     check_sensitive_content(files, errors)
     check_conflict_markers(files, errors)
+    check_font_configuration(errors)
 
     if errors:
         for error in errors:

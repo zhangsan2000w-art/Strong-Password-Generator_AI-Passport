@@ -18,7 +18,7 @@ AI-generated or AI-edited code was reviewed through source inspection and execut
 - Nine deterministic MoonBit tests cover generation policies, boundaries, character classes, passphrase formatting, dictionary indexes, rejection sampling, entropy bounds, and state transitions.
 - ESP-IDF 5.5.3 compiles generated MoonBit C into the ESP32-C3 application.
 - The merged image verifier checks bootloader, partition table, application offsets, partition fit, and the complete `-full.bin` image.
-- Physical-device validation is intentionally reported as not run until a real AI Passport is flashed and observed.
+- An earlier image was flashed to a real AI Passport. The observation confirmed layout and PIN output but found blank custom-font labels. The compressed-font configuration fix is build-verified and remains pending a fresh device flash.
 
 ## Human review checklist
 

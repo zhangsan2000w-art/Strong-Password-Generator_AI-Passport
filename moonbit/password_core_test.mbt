@@ -97,7 +97,7 @@ test "random password validates length boundaries" {
     generate_random_password(
       fn() { source.next() },
       fn(ch) { output.emit(ch) },
-      7,
+      5,
       true,
       false,
     ),
@@ -108,30 +108,30 @@ test "random password validates length boundaries" {
     generate_random_password(
       fn() { source.next() },
       fn(ch) { output.emit(ch) },
-      8,
+      6,
       true,
       false,
     ),
     generate_ok,
   )
-  @test.assert_eq(output.values.length(), 8)
+  @test.assert_eq(output.values.length(), 6)
   let maximum = Collector::{ values: [], }
   @test.assert_eq(
     generate_random_password(
       fn() { source.next() },
       fn(ch) { maximum.emit(ch) },
-      64,
+      30,
       false,
       false,
     ),
     generate_ok,
   )
-  @test.assert_eq(maximum.values.length(), 64)
+  @test.assert_eq(maximum.values.length(), 30)
   @test.assert_eq(
     generate_random_password(
       fn() { source.next() },
       fn(ch) { maximum.emit(ch) },
-      65,
+      31,
       false,
       false,
     ),
@@ -147,13 +147,13 @@ test "random password enforces enabled character classes" {
     generate_random_password(
       fn() { source.next() },
       fn(ch) { output.emit(ch) },
-      20,
+      10,
       true,
       true,
     ),
     generate_ok,
   )
-  @test.assert_eq(output.values.length(), 20)
+  @test.assert_eq(output.values.length(), 10)
   @test.assert_eq(contains_digit(output.values), true)
   @test.assert_eq(contains_symbol(output.values), true)
 }
@@ -278,7 +278,7 @@ test "passphrase rejects invalid configuration and dictionary indexes" {
 test "state switches modes edits toggles generates and regenerates" {
   let mut state = initial_state()
   @test.assert_eq(state_get(state, state_field_mode), 0)
-  @test.assert_eq(state_get(state, state_field_random_length), 20)
+  @test.assert_eq(state_get(state, state_field_random_length), 10)
   state = handle_input(state, input_down)
   @test.assert_eq(state_get(state, state_field_mode), 1)
   state = handle_input(state, input_up)
@@ -288,10 +288,10 @@ test "state switches modes edits toggles generates and regenerates" {
   state = handle_input(state, input_ok)
   @test.assert_eq(state_get(state, state_field_editing), 1)
   state = handle_input(state, input_up)
-  @test.assert_eq(state_get(state, state_field_random_length), 21)
+  @test.assert_eq(state_get(state, state_field_random_length), 11)
   state = handle_input(state, input_ok_long)
   @test.assert_eq(state_get(state, state_field_editing), 0)
-  @test.assert_eq(state_get(state, state_field_random_length), 20)
+  @test.assert_eq(state_get(state, state_field_random_length), 10)
   state = handle_input(state, input_down)
   @test.assert_eq(state_get(state, state_field_focus), 2)
   state = handle_input(state, input_ok)
@@ -309,9 +309,28 @@ test "state switches modes edits toggles generates and regenerates" {
 }
 
 ///|
+test "repeated editing input clamps password length" {
+  let mut state = initial_state()
+  state = handle_input(state, input_ok)
+  state = handle_input(state, input_ok)
+  @test.assert_eq(state_get(state, state_field_editing), 1)
+  let mut repeats = 0
+  while repeats < 20 {
+    state = handle_input(state, input_down)
+    repeats = repeats + 1
+  }
+  @test.assert_eq(
+    state_get(state, state_field_random_length),
+    random_min_length,
+  )
+  state = handle_input(state, input_ok)
+  @test.assert_eq(state_get(state, state_field_editing), 0)
+}
+
+///|
 test "entropy estimates respect mode bounds" {
-  @test.assert_eq(random_entropy_bits_x10(7, true, false), 0)
-  @test.assert_eq(random_entropy_bits_x10(20, true, false) > 1000, true)
+  @test.assert_eq(random_entropy_bits_x10(5, true, false), 0)
+  @test.assert_eq(random_entropy_bits_x10(10, true, false) > 500, true)
   @test.assert_eq(pin_entropy_bits_x10(3), 0)
   @test.assert_eq(pin_entropy_bits_x10(6) > 190, true)
   @test.assert_eq(passphrase_entropy_bits_x10(4, true) > 400, true)

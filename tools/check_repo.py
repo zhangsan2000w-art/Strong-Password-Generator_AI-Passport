@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+MIN_PRODUCT_MOONBIT_LINES = 1_000
 SECRET_PATTERNS = {
     "GitHub token": re.compile(r"(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}"),
     "AWS access key": re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -211,6 +212,31 @@ def check_font_configuration(errors: list[str]) -> None:
         )
 
 
+def moonbit_product_lines() -> int:
+    """Count nonblank, non-comment MoonBit product lines, excluding tests."""
+    count = 0
+    for path in sorted((ROOT / "moonbit").glob("*.mbt")):
+        if path.name.endswith(("_test.mbt", "_wbtest.mbt")):
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("//"):
+                count += 1
+    return count
+
+
+def check_moonbit_ownership(errors: list[str]) -> int:
+    """Prevent the firmware's product core from regressing into a thin shim."""
+    product_lines = moonbit_product_lines()
+    if product_lines < MIN_PRODUCT_MOONBIT_LINES:
+        errors.append(
+            "moonbit: product implementation has "
+            f"{product_lines} effective lines; expected at least "
+            f"{MIN_PRODUCT_MOONBIT_LINES} (tests excluded)"
+        )
+    return product_lines
+
+
 def main() -> int:
     errors: list[str] = []
     files = text_files()
@@ -222,13 +248,17 @@ def main() -> int:
     check_sensitive_content(files, errors)
     check_conflict_markers(files, errors)
     check_font_configuration(errors)
+    product_moonbit_lines = check_moonbit_ownership(errors)
 
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    print(f"Repository checks: PASS ({len(files)} text files scanned)")
+    print(
+        f"Repository checks: PASS ({len(files)} text files scanned; "
+        f"{product_moonbit_lines} effective product MoonBit lines)"
+    )
     return 0
 
 

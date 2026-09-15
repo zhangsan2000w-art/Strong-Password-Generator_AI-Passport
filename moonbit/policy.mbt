@@ -1,8 +1,8 @@
 ///|
-pub let random_min_length : Int = 8
+pub let random_min_length : Int = 6
 
 ///|
-pub let random_max_length : Int = 64
+pub let random_max_length : Int = 30
 
 ///|
 pub let pin_min_length : Int = 4

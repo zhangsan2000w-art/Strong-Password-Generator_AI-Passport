@@ -32,11 +32,11 @@ pub fn generate_passphrase(
     let mut character_index = 0
     while character_index < output_length {
       let mut ch = dictionary_char(word_index, character_index)
-      if ch < 0 {
+      if !dictionary_character_valid(ch) {
         return generate_invalid_config
       }
-      if capitalize && character_index == 0 && ch >= 97 && ch <= 122 {
-        ch = ch - 32
+      if capitalize && character_index == 0 {
+        ch = uppercase_ascii(ch)
       }
       if !emit(ch) {
         return generate_output_failed

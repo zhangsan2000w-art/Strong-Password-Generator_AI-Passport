@@ -12,6 +12,7 @@
 #include "moonbit_password.h"
 #include "password_app.h"
 #include "password_platform.h"
+#include "password_sound.h"
 
 #define INPUT_QUEUE_DEPTH 8
 
@@ -103,6 +104,11 @@ void app_main(void)
         password_app_enter();
         bsp_lvgl_unlock();
         s_input_ready = input_error == ESP_OK && button_error == ESP_OK;
+    }
+
+    esp_err_t sound_error = password_sound_init();
+    if (sound_error != ESP_OK) {
+        ESP_LOGW(TAG, "Success sound unavailable: %s", esp_err_to_name(sound_error));
     }
 
     ESP_LOGI(

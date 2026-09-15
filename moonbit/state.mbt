@@ -38,6 +38,12 @@ let pin_length_shift : Int = 30
 let action_shift : Int = 34
 
 ///|
+let result_shift : Int = 36
+
+///|
+let generation_count_shift : Int = 38
+
+///|
 pub let state_field_mode : Int = 0
 
 ///|
@@ -71,6 +77,12 @@ pub let state_field_separator : Int = 9
 pub let state_field_pin_length : Int = 10
 
 ///|
+pub let state_field_result : Int = 11
+
+///|
+pub let state_field_generation_count : Int = 12
+
+///|
 pub let input_up : Int = 0
 
 ///|
@@ -89,6 +101,15 @@ pub let action_none : Int = 0
 pub let action_generate : Int = 1
 
 ///|
+pub let result_empty : Int = 0
+
+///|
+pub let result_success : Int = 1
+
+///|
+pub let result_failure : Int = 2
+
+///|
 fn field(value : UInt64, shift : Int, mask : Int) -> Int {
   ((value >> shift) & mask.to_uint64()).to_int()
 }
@@ -105,7 +126,7 @@ pub fn initial_state() -> UInt64 {
   let mut state = 0UL
   state = set_field(state, mode_shift, 3, 0)
   state = set_field(state, focus_shift, 15, 0)
-  state = set_field(state, random_length_shift, 127, 20)
+  state = set_field(state, random_length_shift, 127, 10)
   state = set_field(state, digits_shift, 1, 1)
   state = set_field(state, symbols_shift, 1, 0)
   state = set_field(state, word_count_shift, 7, 4)
@@ -130,6 +151,8 @@ pub fn state_get(state : UInt64, requested : Int) -> Int {
     8 => field(state, complete_word_shift, 1)
     9 => field(state, separator_shift, 3)
     10 => field(state, pin_length_shift, 15)
+    11 => field(state, result_shift, 3)
+    12 => field(state, generation_count_shift, 65535)
     _ => -1
   }
 }
@@ -140,7 +163,42 @@ pub fn state_action(state : UInt64) -> Int {
 }
 
 ///|
-fn mode_max_focus(mode : Int) -> Int {
+pub fn clear_generation_result(state : UInt64) -> UInt64 {
+  set_field(state, result_shift, 3, result_empty)
+}
+
+///|
+pub fn record_generation_result(state : UInt64, result : Int) -> UInt64 {
+  let status = if result == generate_ok {
+    result_success
+  } else {
+    result_failure
+  }
+  let mut next = set_field(state, result_shift, 3, status)
+  if status == result_success {
+    let count = state_get(state, state_field_generation_count)
+    next = set_field(
+      next,
+      generation_count_shift,
+      65535,
+      (count + 1).clamp(min=0, max=65535),
+    )
+  }
+  next
+}
+
+///|
+pub fn apply_input(state : UInt64, input : Int) -> UInt64 {
+  let next = handle_input(state, input)
+  if configuration_changed(state, next) {
+    clear_generation_result(next)
+  } else {
+    next
+  }
+}
+
+///|
+pub fn mode_max_focus(mode : Int) -> Int {
   match mode {
     0 => 4
     1 => 5

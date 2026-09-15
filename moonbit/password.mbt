@@ -45,6 +45,9 @@ pub fn generate_random_password(
     output[j] = temporary
     i = i - 1
   }
+  if !random_candidate_valid(output, digits, symbols) {
+    return generate_invalid_config
+  }
   i = 0
   while i < length {
     if !emit(output[i]) {
@@ -64,9 +67,18 @@ pub fn generate_pin(
   if length < pin_min_length || length > pin_max_length {
     return generate_invalid_config
   }
+  let output = FixedArray::make(length, 0)
   let mut i = 0
   while i < length {
-    if !emit(48 + unbiased_index(next_u32, 10)) {
+    output[i] = 48 + unbiased_index(next_u32, 10)
+    i = i + 1
+  }
+  if !pin_candidate_valid(output) {
+    return generate_invalid_config
+  }
+  i = 0
+  while i < length {
+    if !emit(output[i]) {
       return generate_output_failed
     }
     i = i + 1

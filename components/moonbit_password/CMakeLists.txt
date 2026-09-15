@@ -5,13 +5,19 @@ set(GENERATED_MOONBIT_C "${GENERATED_DIR}/password_core.c")
 set(GENERATED_WORDLIST_C "${GENERATED_DIR}/eff_short_wordlist.c")
 
 set(MOONBIT_SOURCES
+    "${MOONBIT_SOURCE_DIR}/battery.mbt"
     "${MOONBIT_SOURCE_DIR}/entropy.mbt"
     "${MOONBIT_SOURCE_DIR}/ffi.mbt"
+    "${MOONBIT_SOURCE_DIR}/input_policy.mbt"
     "${MOONBIT_SOURCE_DIR}/passphrase.mbt"
     "${MOONBIT_SOURCE_DIR}/password.mbt"
     "${MOONBIT_SOURCE_DIR}/policy.mbt"
     "${MOONBIT_SOURCE_DIR}/random_source.mbt"
+    "${MOONBIT_SOURCE_DIR}/security_policy.mbt"
+    "${MOONBIT_SOURCE_DIR}/sound.mbt"
     "${MOONBIT_SOURCE_DIR}/state.mbt"
+    "${MOONBIT_SOURCE_DIR}/strength.mbt"
+    "${MOONBIT_SOURCE_DIR}/view_model.mbt"
 )
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)

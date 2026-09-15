@@ -4,7 +4,7 @@ English | [简体中文](SECURITY.zh_CN.md)
 
 ## Security goal
 
-Generated passwords must come from a cryptographically suitable device random source and stay local to the current screen session. The firmware does not initialize Wi-Fi, BLE, or NFC, and it has no password logging, history, NVS write, clipboard, or transmission path.
+Generated passwords must come from a cryptographically suitable device random source and stay local to the current screen session. The firmware does not initialize Wi-Fi, BLE, or NFC, and it has no password logging, history, NVS write, clipboard, or screen-capture transport path.
 
 ## Randomness design
 

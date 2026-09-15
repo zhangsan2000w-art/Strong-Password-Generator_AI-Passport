@@ -12,6 +12,7 @@
 
 ## Unreleased
 
+- Added the password generator cyberpunk theme, held-key numeric editing, heavier CJK text, a success chime, and live battery refresh. Random now defaults to 10 with a 6–30 range. CW2017 uses its built-in Li-Poly profile without resetting continuous SOC state on every application start.
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 
 - Expanded the environment bootstrap document: added Espressif's Git service mirror (`git.espressif.com.cn`) as the preferred mainland-China route for ESP-IDF v5.5.3 and its submodules, documented submodule long-wait/timeout handling, in-place repair, and the pinned-commit shallow fetch for large submodules such as `esp32-wifi-lib`, warned about stale per-repository Jihulab `insteadOf` residue, and added the official offline release archive as a last-resort fallback (learned from `esp-mosaico/esp-mosaico-vibe`).

@@ -8,11 +8,29 @@
 
 ## 功能
 
-- **随机**：8～64 个可显示 ASCII 字符，默认长度 20；字母始终开启，可选数字和符号。开启的可选字符类别保证至少出现一个。
+- **随机**：6～30 个可显示 ASCII 字符，默认长度 10；字母始终开启，可选数字和符号。开启的可选字符类别保证至少出现一个。
 - **易记**：3～6 个离线单词，默认 4 个；支持首字母大写、完整单词或四字符缩写，以及 `-`、`.`、`_` 分隔符。
 - **PIN**：4～12 位十进制数字，默认 6 位。
-- **输入**：只使用 `UP`、`DOWN`、`OK`。`OK` 用于进入或确认编辑、切换布尔值及生成；长按 `OK` 取消当前编辑，在普通主界面不执行破坏性动作。
-- **核心**：生成策略、无偏随机索引映射、熵估算、应用状态与状态转换均由 MoonBit 实现。
+- **输入**：只使用 `UP`、`DOWN`、`OK`。`OK` 用于进入或确认编辑、切换布尔值及生成；编辑数值时长按 `UP` / `DOWN` 可连续增减；长按 `OK` 取消当前编辑，在普通主界面不执行破坏性动作。
+- **反馈**：成功双音的频率、时长、包络和 PCM 样本由 MoonBit 生成，C 音频任务只负责非阻塞播放。
+- **显示**：240×320 赛博朋克深色界面；中文采用 17px、4bpp、强提示字体子集；MoonBit 视图模型决定参数槽位、焦点、布局、强度颜色及电量显示策略。
+- **核心**：生成策略、无偏随机索引、输出后置校验、熵与强度、应用状态、视图模型、电池策略和声音合成都由 MoonBit 实现。
+
+## MoonBit 主体实现
+
+当前仓库有 1,630 行生产 `.mbt` 与 659 行 MoonBit 测试，共 2,289 行。排除测试、空行和注释后，生产 MoonBit 有效代码为 1,223 行。`tools/check_repo.py` 会独立检查生产实现不少于 1,000 有效行，测试代码不能用于凑这个门槛。
+
+MoonBit 生产模块直接进入 ESP-IDF 构建，并被固件调用：
+
+- 密码、PIN、Passphrase 算法及启用字符类别保证；
+- RandomSource 抽象、rejection sampling 和生成后安全校验；
+- 参数约束、熵估算与强度分级；
+- NAVIGATION / EDITING 状态机与配置差异判断；
+- UI 参数槽位、坐标、焦点、编辑态和值的视图模型；
+- CW2017 原始读数到可显示电量的纯策略；
+- 成功双音序列、淡入淡出包络和 PCM 样本生成。
+
+C 只保留 ESP-IDF/BSP 初始化、LVGL 控件绘制、I2C 原始读数、FreeRTOS 调度、音频写入、安全随机源及 Flash 词库访问。
 
 ## 工具链
 
@@ -87,7 +105,7 @@ python -m esptool --chip esp32c3 --baud 460800 \
 
 - 易记模式内置 Electronic Frontier Foundation 的 1,296 词 [EFF Short Wordlist for Passphrases #1](https://www.eff.org/files/2016/09/08/eff_short_wordlist_1.txt)，按 CC BY 3.0 US 署名使用。仓库内源文件 SHA-256 为 `8f5ca830b8bffb6fe39c9736c024a00a6a6411adb3f83a9be8bfeeb6e067ae69`。
 - 构建时代码生成器将单词打包为一个以 NUL 分隔的常量字节块和 16 位偏移表。数据保留在 Flash 中，启动时不会整体加载进 RAM。
-- 中文 LVGL 字形子集由 Noto Sans SC 生成，OFL 1.1 声明位于 [`assets/fonts/NotoSansSC-OFL.txt`](assets/fonts/NotoSansSC-OFL.txt)。固件仅编入 ASCII 和 V1 界面需要的中文字形。
+- 中文 LVGL 字形子集由 Noto Sans SC 生成，OFL 1.1 声明位于 [`assets/fonts/NotoSansSC-OFL.txt`](assets/fonts/NotoSansSC-OFL.txt)。固件仅编入 ASCII 和 V1 界面需要的中文字形；当前子集使用 17px、4bpp 和强 autohint 改善小屏笔画粗细。
 - 字形子集使用 LVGL 压缩字体格式，因此 `sdkconfig.defaults` 启用 `CONFIG_LV_USE_FONT_COMPRESSED=y`。如果面板和生成结果正常，但标题、模式与按钮文字为空白，请按默认配置重新构建，并确认生成的 `sdkconfig` 包含该选项。
 - 随固件编译的 MoonBit runtime 文件保留 Apache-2.0 声明，见 [`components/moonbit_password/RUNTIME_LICENSE.txt`](components/moonbit_password/RUNTIME_LICENSE.txt)。项目自有代码沿用仓库 MIT License。
 
@@ -100,4 +118,4 @@ python -m esptool --chip esp32c3 --baud 460800 \
 
 ## 验证状态
 
-MoonBit 主机测试和完整 ESP-IDF 固件构建已在开发环境通过。一次真机运行已确认界面布局和 PIN 生成，同时发现旧镜像的自定义字体标签为空白。压缩字体支持现已启用并通过构建验证；修复后的镜像仍需重新烧录，才能把字体修复标记为真机验证通过。
+35 项 MoonBit 主机测试、生产 MoonBit 有效行数门禁、仓库检查、辅助 Python/C 主机测试，以及包含本轮修改的 ESP-IDF 5.5.3 构建均已通过。用户确认上一版中文字体已经正常显示，但笔画偏细。当前加粗字体、电量连续跟踪修复、MoonBit 视图/电量/声音迁移和成功音效仍需随新固件一起真机验证。首次电池 profile 修复只在开机初始显示正常，运行后仍出现 77% 和不充电冷启动 0%，因此当前实现进一步取消了每次开机复位 CW2017。

@@ -1,0 +1,8 @@
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+moonbit/_build/
+__pycache__/
+.vscode/
+.idea/

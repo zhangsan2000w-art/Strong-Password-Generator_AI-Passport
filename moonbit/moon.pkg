@@ -1,0 +1,9 @@
+pkgtype(kind: "foreign_library")
+
+import {
+  "moonbitlang/core/test",
+} for "test"
+
+options(
+  "native-stub": [ "host_stubs.c" ],
+)

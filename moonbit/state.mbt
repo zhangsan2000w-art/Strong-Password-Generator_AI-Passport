@@ -44,6 +44,9 @@ let result_shift : Int = 36
 let generation_count_shift : Int = 38
 
 ///|
+let theme_shift : Int = 54
+
+///|
 pub let state_field_mode : Int = 0
 
 ///|
@@ -83,6 +86,9 @@ pub let state_field_result : Int = 11
 pub let state_field_generation_count : Int = 12
 
 ///|
+pub let state_field_theme : Int = 13
+
+///|
 pub let input_up : Int = 0
 
 ///|
@@ -93,6 +99,12 @@ pub let input_ok : Int = 2
 
 ///|
 pub let input_ok_long : Int = 3
+
+///|
+pub let theme_cyber : Int = 0
+
+///|
+pub let theme_sky : Int = 1
 
 ///|
 pub let action_none : Int = 0
@@ -153,6 +165,7 @@ pub fn state_get(state : UInt64, requested : Int) -> Int {
     10 => field(state, pin_length_shift, 15)
     11 => field(state, result_shift, 3)
     12 => field(state, generation_count_shift, 65535)
+    13 => field(state, theme_shift, 1)
     _ => -1
   }
 }
@@ -311,7 +324,7 @@ pub fn handle_input(original : UInt64, input : Int) -> UInt64 {
     return state
   }
   if input == input_ok_long {
-    return state
+    return set_field(state, theme_shift, 1, 1 - field(state, theme_shift, 1))
   }
   if focus == 0 {
     if input == input_up {

@@ -227,6 +227,12 @@ pub fn passport_moonbit_view_generate_focused(state : UInt64) -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_view_theme")
+pub fn passport_moonbit_view_theme(state : UInt64) -> Int {
+  view_theme(state)
+}
+
+///|
 #export_name("passport_moonbit_battery_resolve")
 pub fn passport_moonbit_battery_resolve(percent : Int, millivolts : Int) -> Int {
   battery_resolve(percent, millivolts)

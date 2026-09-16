@@ -190,6 +190,11 @@ pub fn view_generate_focused(state : UInt64) -> Bool {
 }
 
 ///|
+pub fn view_theme(state : UInt64) -> Int {
+  state_get(state, state_field_theme)
+}
+
+///|
 pub fn configuration_fingerprint(state : UInt64) -> UInt64 {
   let mut fingerprint = 0UL
   fingerprint = fingerprint | state_get(state, state_field_mode).to_uint64()

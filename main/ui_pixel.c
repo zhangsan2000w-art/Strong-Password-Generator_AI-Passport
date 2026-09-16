@@ -2,6 +2,56 @@
 
 static void start_blink(lv_obj_t *eye);
 
+static const ui_pixel_palette_t s_cyber_palette = {
+    .sky = 0x050816,
+    .sky_dark = 0x00D9FF,
+    .ink = 0x02040C,
+    .paper = 0x0C1730,
+    .grass = 0x17103B,
+    .grass_dark = 0xFF2BD6,
+    .yellow = 0x00F5FF,
+    .orange = 0xFF2BD6,
+    .red = 0xFF3B78,
+    .muted = 0x536787,
+    .text = 0xEAFBFF,
+    .lime = 0xB6FF2E,
+    .violet = 0x7A2CFF,
+};
+
+static const ui_pixel_palette_t s_sky_palette = {
+    .sky = 0x1689E8,
+    .sky_dark = 0x0872C9,
+    .ink = 0x17202A,
+    .paper = 0xF4F4EA,
+    .grass = 0x82BE2D,
+    .grass_dark = 0x55951D,
+    .yellow = 0xFFD928,
+    .orange = 0xFFB23E,
+    .red = 0xE43B2F,
+    .muted = 0xD9E7EC,
+    .text = 0x17202A,
+    .lime = 0x82BE2D,
+    .violet = 0x0872C9,
+};
+
+static const ui_pixel_palette_t *s_palette = &s_cyber_palette;
+
+const ui_pixel_palette_t *ui_pixel_palette(void)
+{
+    return s_palette;
+}
+
+ui_pixel_theme_t ui_pixel_get_theme(void)
+{
+    return s_palette == &s_sky_palette ? UI_PIXEL_THEME_SKY
+                                       : UI_PIXEL_THEME_CYBER;
+}
+
+void ui_pixel_set_theme(ui_pixel_theme_t theme)
+{
+    s_palette = theme == UI_PIXEL_THEME_SKY ? &s_sky_palette : &s_cyber_palette;
+}
+
 static lv_obj_t *block(lv_obj_t *parent, int x, int y, int w, int h, uint32_t color)
 {
     lv_obj_t *obj = lv_obj_create(parent);
@@ -25,7 +75,27 @@ lv_obj_t *ui_pixel_label(lv_obj_t *parent, const char *text,
     return label;
 }
 
-/* 顶部信号条与底部透视网格替代原先的云朵和草地，保持纯矩形、低 RAM。 */
+/* 蓝天白云风：白云与草地。 */
+static void add_cloud(lv_obj_t *parent, int x, int y)
+{
+    block(parent, x + 1, y + 7, 43, 10, UI_INK);
+    block(parent, x + 5, y + 4, 35, 10, 0xFFFFFF);
+    block(parent, x + 12, y, 10, 9, 0xFFFFFF);
+    block(parent, x + 27, y + 1, 9, 8, 0xFFFFFF);
+}
+
+static void add_sky_decor(lv_obj_t *parent)
+{
+    add_cloud(parent, 188, 8);
+    block(parent, 0, 286, 240, 34, UI_GRASS);
+    block(parent, 0, 286, 240, 4, 0xA7D93E);
+    for (int x = 0; x < 240; x += 30) {
+        block(parent, x, 312, 18, 8, UI_GRASS_DARK);
+        block(parent, x + 18, 316, 12, 4, 0x75452E);
+    }
+}
+
+/* 赛博朋克风：顶部信号条与底部透视网格，保持纯矩形、低 RAM。 */
 static void add_cyber_decor(lv_obj_t *parent)
 {
     block(parent, 190, 9, 9, 3, UI_VIOLET);
@@ -40,6 +110,15 @@ static void add_cyber_decor(lv_obj_t *parent)
     }
 }
 
+static void add_theme_decor(lv_obj_t *parent)
+{
+    if (ui_pixel_get_theme() == UI_PIXEL_THEME_SKY) {
+        add_sky_decor(parent);
+    } else {
+        add_cyber_decor(parent);
+    }
+}
+
 lv_obj_t *ui_pixel_screen_create_with_font(const char *title, const lv_font_t *font)
 {
     lv_obj_t *scr = lv_obj_create(NULL);
@@ -48,13 +127,23 @@ lv_obj_t *ui_pixel_screen_create_with_font(const char *title, const lv_font_t *f
     lv_obj_set_style_border_width(scr, 0, 0);
     lv_obj_set_style_pad_all(scr, 0, 0);
 
-    add_cyber_decor(scr);
+    add_theme_decor(scr);
 
-    block(scr, 9, 12, 151, 33, UI_GRASS_DARK);
-    lv_obj_t *plate = block(scr, 5, 8, 151, 33, UI_PAPER);
-    lv_obj_set_style_border_color(plate, lv_color_hex(UI_SKY_DARK), 0);
-    lv_obj_set_style_border_width(plate, 2, 0);
-    lv_obj_t *heading = ui_pixel_label(plate, title, font, UI_TEXT);
+    lv_obj_t *plate;
+    lv_obj_t *heading;
+    if (ui_pixel_get_theme() == UI_PIXEL_THEME_SKY) {
+        block(scr, 9, 12, 151, 33, UI_INK);
+        plate = block(scr, 5, 8, 151, 33, UI_PAPER);
+        lv_obj_set_style_border_color(plate, lv_color_hex(UI_INK), 0);
+        lv_obj_set_style_border_width(plate, 3, 0);
+        heading = ui_pixel_label(plate, title, font, UI_TEXT);
+    } else {
+        block(scr, 9, 12, 151, 33, UI_GRASS_DARK);
+        plate = block(scr, 5, 8, 151, 33, UI_PAPER);
+        lv_obj_set_style_border_color(plate, lv_color_hex(UI_SKY_DARK), 0);
+        lv_obj_set_style_border_width(plate, 2, 0);
+        heading = ui_pixel_label(plate, title, font, UI_TEXT);
+    }
     lv_obj_center(heading);
     return scr;
 }
@@ -67,10 +156,18 @@ lv_obj_t *ui_pixel_screen_create(const char *title)
 lv_obj_t *ui_pixel_panel_create(lv_obj_t *parent, int x, int y, int w, int h,
                                 uint32_t color)
 {
-    block(parent, x + 4, y + 5, w, h, UI_GRASS_DARK);
-    lv_obj_t *panel = block(parent, x, y, w, h, color);
-    lv_obj_set_style_border_color(panel, lv_color_hex(UI_SKY_DARK), 0);
-    lv_obj_set_style_border_width(panel, 2, 0);
+    lv_obj_t *panel;
+    if (ui_pixel_get_theme() == UI_PIXEL_THEME_SKY) {
+        block(parent, x + 5, y + 6, w, h, UI_INK);
+        panel = block(parent, x, y, w, h, color);
+        lv_obj_set_style_border_color(panel, lv_color_hex(UI_INK), 0);
+        lv_obj_set_style_border_width(panel, 4, 0);
+    } else {
+        block(parent, x + 4, y + 5, w, h, UI_GRASS_DARK);
+        panel = block(parent, x, y, w, h, color);
+        lv_obj_set_style_border_color(panel, lv_color_hex(UI_SKY_DARK), 0);
+        lv_obj_set_style_border_width(panel, 2, 0);
+    }
     lv_obj_set_style_pad_all(panel, 7, 0);
     return panel;
 }

@@ -156,3 +156,25 @@ test "MoonBit maps click and held gestures by editing state" {
     input_ignored,
   )
 }
+
+///|
+test "theme defaults to cyber and toggles on long OK when not editing" {
+  let initial = initial_state()
+  @test.assert_eq(view_theme(initial), theme_cyber)
+  let sky = handle_input(initial, input_ok_long)
+  @test.assert_eq(view_theme(sky), theme_sky)
+  let back = handle_input(sky, input_ok_long)
+  @test.assert_eq(view_theme(back), theme_cyber)
+  @test.assert_eq(configuration_changed(initial, sky), false)
+}
+
+///|
+test "long OK while editing cancels without changing theme" {
+  let initial = initial_state()
+  let focused = handle_input(initial, input_ok)
+  let editing = handle_input(focused, input_ok)
+  @test.assert_eq(state_get(editing, state_field_editing), 1)
+  let cancelled = handle_input(editing, input_ok_long)
+  @test.assert_eq(state_get(cancelled, state_field_editing), 0)
+  @test.assert_eq(view_theme(cancelled), theme_cyber)
+}

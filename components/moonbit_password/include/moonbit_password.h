@@ -30,6 +30,7 @@ int32_t passport_moonbit_view_parameter_editing(uint64_t state, int32_t slot);
 int32_t passport_moonbit_view_mode_selected(uint64_t state, int32_t mode);
 int32_t passport_moonbit_view_mode_focused(uint64_t state, int32_t mode);
 int32_t passport_moonbit_view_generate_focused(uint64_t state);
+int32_t passport_moonbit_view_theme(uint64_t state);
 int32_t passport_moonbit_battery_resolve(int32_t percent, int32_t millivolts);
 int32_t passport_moonbit_battery_percent(int32_t reading);
 int32_t passport_moonbit_battery_available(int32_t reading);

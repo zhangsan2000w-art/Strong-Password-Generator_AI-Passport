@@ -55,6 +55,7 @@ static lv_obj_t *s_generate_label;
 static lv_obj_t *s_battery_label;
 static lv_timer_t *s_battery_timer;
 static uint64_t s_state;
+static ui_pixel_theme_t s_theme;
 
 static int state_value(int field)
 {
@@ -252,11 +253,39 @@ static void refresh_ui(void)
     );
 }
 
-void password_app_enter(void)
+static void password_app_teardown_ui(void)
+{
+    if (s_battery_timer) {
+        lv_timer_delete(s_battery_timer);
+        s_battery_timer = NULL;
+    }
+    if (s_screen) {
+        lv_obj_delete(s_screen);
+        s_screen = NULL;
+    }
+    s_battery_label = NULL;
+    s_status_label = NULL;
+    s_entropy_label = NULL;
+    s_result_label = NULL;
+    s_generate_panel = NULL;
+    s_generate_label = NULL;
+    for (int i = 0; i < 3; i++) {
+        s_mode_panels[i] = NULL;
+        s_mode_labels[i] = NULL;
+    }
+    for (int i = 0; i < 4; i++) {
+        s_parameter_labels[i] = NULL;
+    }
+}
+
+static void password_app_build_ui(void)
 {
     static const char *mode_names[] = {"随机", "易记", "PIN"};
-    s_state = passport_moonbit_initial_state();
-    password_platform_clear_output();
+
+    password_app_teardown_ui();
+
+    s_theme = (ui_pixel_theme_t)passport_moonbit_view_theme(s_state);
+    ui_pixel_set_theme(s_theme);
 
     s_screen = ui_pixel_screen_create_with_font("强密码生成器", &passport_font_zh_16);
     s_battery_label = ui_pixel_label(
@@ -311,6 +340,13 @@ void password_app_enter(void)
     lv_screen_load(s_screen);
 }
 
+void password_app_enter(void)
+{
+    s_state = passport_moonbit_initial_state();
+    password_platform_clear_output();
+    password_app_build_ui();
+}
+
 void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
 {
     int button_code = button == BSP_BTN_UP ? BUTTON_UP
@@ -339,7 +375,11 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
     }
 
     if (bsp_lvgl_lock(500)) {
-        refresh_ui();
+        if ((ui_pixel_theme_t)passport_moonbit_view_theme(s_state) != s_theme) {
+            password_app_build_ui();
+        } else {
+            refresh_ui();
+        }
         bsp_lvgl_unlock();
     }
 }

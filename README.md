@@ -36,7 +36,8 @@ C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readin
 
 This project is built on the open-source [FoloToy AI Passport](https://github.com/FoloToy/ai-passport) firmware and hardware support stack.
 
-The upstream ESP-IDF/BSP, hardware drivers, peripheral support, and related components remain subject to their original licenses and copyright notices.
+The upstream FoloToy AI Passport project is licensed under the MIT License.
+Its original copyright and license notices are retained in this repository.
 
 This repository adds the MoonBit-based password generator, product logic, interaction design, UI, tests, documentation, and related firmware modifications for MoonBit Hackathon 2026.
 

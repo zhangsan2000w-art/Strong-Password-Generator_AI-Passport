@@ -32,6 +32,14 @@ The production MoonBit modules are compiled into and called by the ESP-IDF firmw
 
 C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readings, FreeRTOS scheduling, codec writes, the secure-random source, and Flash dictionary access.
 
+## Upstream and attribution
+
+This project is built on the open-source [FoloToy AI Passport](https://github.com/FoloToy/ai-passport) firmware and hardware support stack.
+
+The upstream ESP-IDF/BSP, hardware drivers, peripheral support, and related components remain subject to their original licenses and copyright notices.
+
+This repository adds the MoonBit-based password generator, product logic, interaction design, UI, tests, documentation, and related firmware modifications for MoonBit Hackathon 2026.
+
 ## Toolchains
 
 - ESP-IDF 5.5.3, target `esp32c3`

@@ -32,6 +32,14 @@ MoonBit 生产模块直接进入 ESP-IDF 构建，并被固件调用：
 
 C 只保留 ESP-IDF/BSP 初始化、LVGL 控件绘制、I2C 原始读数、FreeRTOS 调度、音频写入、安全随机源及 Flash 词库访问。
 
+## 上游项目与来源说明
+
+本项目基于开源的 [FoloToy AI Passport](https://github.com/FoloToy/ai-passport) 固件与硬件支持工程进行开发。
+
+原项目中的 ESP-IDF/BSP、硬件驱动、外设支持及相关组件继续遵循其原有许可证和版权声明。
+
+本仓库在此基础上新增了面向 MoonBit Hackathon 2026 的 MoonBit 密码生成核心、产品逻辑、交互设计、UI、测试、文档及相关固件修改。
+
 ## 工具链
 
 - ESP-IDF 5.5.3，目标为 `esp32c3`

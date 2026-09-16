@@ -150,6 +150,11 @@ pub fn initial_state() -> UInt64 {
 }
 
 ///|
+pub fn with_theme(state : UInt64, theme : Int) -> UInt64 {
+  set_field(state, theme_shift, 1, if theme == theme_sky { 1 } else { 0 })
+}
+
+///|
 pub fn state_get(state : UInt64, requested : Int) -> Int {
   match requested {
     0 => field(state, mode_shift, 3)
@@ -324,7 +329,7 @@ pub fn handle_input(original : UInt64, input : Int) -> UInt64 {
     return state
   }
   if input == input_ok_long {
-    return set_field(state, theme_shift, 1, 1 - field(state, theme_shift, 1))
+    return state
   }
   if focus == 0 {
     if input == input_up {

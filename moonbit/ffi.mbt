@@ -233,6 +233,57 @@ pub fn passport_moonbit_view_theme(state : UInt64) -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_with_theme")
+pub fn passport_moonbit_with_theme(state : UInt64, theme : Int) -> UInt64 {
+  with_theme(state, theme)
+}
+
+///|
+#export_name("passport_moonbit_settings_initial")
+pub fn passport_moonbit_settings_initial(
+  theme : Int,
+  sound_enabled : Int,
+) -> UInt64 {
+  settings_initial(theme, sound_enabled)
+}
+
+///|
+#export_name("passport_moonbit_settings_handle_input")
+pub fn passport_moonbit_settings_handle_input(
+  state : UInt64,
+  input : Int,
+) -> UInt64 {
+  settings_handle_input(state, input)
+}
+
+///|
+#export_name("passport_moonbit_settings_map_button_event")
+pub fn passport_moonbit_settings_map_button_event(
+  button : Int,
+  event : Int,
+) -> Int {
+  settings_map_button_event(button, event)
+}
+
+///|
+#export_name("passport_moonbit_settings_selected")
+pub fn passport_moonbit_settings_selected(state : UInt64) -> Int {
+  settings_selected(state)
+}
+
+///|
+#export_name("passport_moonbit_settings_theme")
+pub fn passport_moonbit_settings_theme(state : UInt64) -> Int {
+  settings_theme(state)
+}
+
+///|
+#export_name("passport_moonbit_settings_sound_enabled")
+pub fn passport_moonbit_settings_sound_enabled(state : UInt64) -> Int {
+  settings_sound_enabled(state)
+}
+
+///|
 #export_name("passport_moonbit_battery_resolve")
 pub fn passport_moonbit_battery_resolve(percent : Int, millivolts : Int) -> Int {
   battery_resolve(percent, millivolts)

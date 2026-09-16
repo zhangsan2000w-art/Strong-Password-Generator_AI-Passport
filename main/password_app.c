@@ -10,12 +10,15 @@
 #include "moonbit_password.h"
 #include "password_platform.h"
 #include "password_sound.h"
+#include "settings_screen.h"
+#include "settings_store.h"
 #include "ui_pixel.h"
 
 LV_FONT_DECLARE(passport_font_zh_16);
 
 enum {
     FIELD_RESULT = 11,
+    FIELD_EDITING = 2,
 };
 
 enum {
@@ -56,6 +59,7 @@ static lv_obj_t *s_battery_label;
 static lv_timer_t *s_battery_timer;
 static uint64_t s_state;
 static ui_pixel_theme_t s_theme;
+static bool s_in_settings;
 
 static int state_value(int field)
 {
@@ -281,8 +285,11 @@ static void password_app_teardown_ui(void)
 static void password_app_build_ui(void)
 {
     static const char *mode_names[] = {"随机", "易记", "PIN"};
+    lv_obj_t *old_screen = s_screen;
+    lv_timer_t *old_battery_timer = s_battery_timer;
 
-    password_app_teardown_ui();
+    s_screen = NULL;
+    s_battery_timer = NULL;
 
     s_theme = (ui_pixel_theme_t)passport_moonbit_view_theme(s_state);
     ui_pixel_set_theme(s_theme);
@@ -338,17 +345,48 @@ static void password_app_build_ui(void)
 
     refresh_ui();
     lv_screen_load(s_screen);
+    if (old_battery_timer) lv_timer_delete(old_battery_timer);
+    if (old_screen) lv_obj_delete(old_screen);
+}
+
+static bool on_settings_exit(void)
+{
+    if (!bsp_lvgl_lock(500)) return false;
+    s_state = passport_moonbit_with_theme(s_state, settings_store_theme());
+    password_app_build_ui();
+    bsp_lvgl_unlock();
+    s_in_settings = false;
+    return true;
 }
 
 void password_app_enter(void)
 {
+    s_in_settings = false;
     s_state = passport_moonbit_initial_state();
+    s_state = passport_moonbit_with_theme(s_state, settings_store_theme());
     password_platform_clear_output();
     password_app_build_ui();
 }
 
 void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
 {
+    if (s_in_settings) {
+        settings_screen_handle_button(button, event);
+        return;
+    }
+
+    bool editing = state_value(FIELD_EDITING) != 0;
+    if (!editing && button == BSP_BTN_OK && event == BSP_BTN_LONG) {
+        if (settings_screen_enter(on_settings_exit)) {
+            s_in_settings = true;
+            if (bsp_lvgl_lock(500)) {
+                password_app_teardown_ui();
+                bsp_lvgl_unlock();
+            }
+        }
+        return;
+    }
+
     int button_code = button == BSP_BTN_UP ? BUTTON_UP
         : (button == BSP_BTN_DOWN ? BUTTON_DOWN
         : (button == BSP_BTN_OK ? BUTTON_OK : -1));
@@ -371,7 +409,7 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
             ? passport_moonbit_generate(s_state) : -1;
         s_state = passport_moonbit_record_generation(s_state, result);
         if (result != 0) password_platform_clear_output();
-        else password_sound_play_success();
+        else if (settings_store_sound_enabled()) password_sound_play_success();
     }
 
     if (bsp_lvgl_lock(500)) {

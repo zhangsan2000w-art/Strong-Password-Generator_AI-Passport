@@ -13,6 +13,7 @@
 #include "password_app.h"
 #include "password_platform.h"
 #include "password_sound.h"
+#include "settings_store.h"
 
 #define INPUT_QUEUE_DEPTH 8
 
@@ -75,6 +76,15 @@ void app_main(void)
     esp_err_t battery_error = bsp_battery_init();
     if (battery_error != ESP_OK) {
         ESP_LOGW(TAG, "Battery gauge unavailable: %s", esp_err_to_name(battery_error));
+    }
+
+    esp_err_t settings_error = settings_store_init();
+    if (settings_error != ESP_OK) {
+        ESP_LOGW(
+            TAG,
+            "Settings persistence unavailable: %s",
+            esp_err_to_name(settings_error)
+        );
     }
 
     if (bsp_display_init() != ESP_OK || !bsp_lvgl_init()) {

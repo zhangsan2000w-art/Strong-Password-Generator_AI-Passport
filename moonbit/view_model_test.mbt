@@ -158,14 +158,26 @@ test "MoonBit maps click and held gestures by editing state" {
 }
 
 ///|
-test "theme defaults to cyber and toggles on long OK when not editing" {
+test "theme defaults to cyber" {
+  @test.assert_eq(view_theme(initial_state()), theme_cyber)
+}
+
+///|
+test "with_theme sets the theme field" {
   let initial = initial_state()
-  @test.assert_eq(view_theme(initial), theme_cyber)
-  let sky = handle_input(initial, input_ok_long)
-  @test.assert_eq(view_theme(sky), theme_sky)
-  let back = handle_input(sky, input_ok_long)
-  @test.assert_eq(view_theme(back), theme_cyber)
-  @test.assert_eq(configuration_changed(initial, sky), false)
+  @test.assert_eq(view_theme(with_theme(initial, theme_sky)), theme_sky)
+  @test.assert_eq(view_theme(with_theme(initial, theme_cyber)), theme_cyber)
+  @test.assert_eq(view_theme(with_theme(initial, 99)), theme_cyber)
+  @test.assert_eq(
+    configuration_changed(initial, with_theme(initial, theme_sky)),
+    false,
+  )
+}
+
+///|
+test "long OK when not editing no longer toggles theme" {
+  let initial = initial_state()
+  @test.assert_eq(view_theme(handle_input(initial, input_ok_long)), theme_cyber)
 }
 
 ///|

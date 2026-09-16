@@ -11,14 +11,23 @@ The firmware starts directly in the generator. It does not connect to a network,
 - **Random**: 6–30 printable ASCII characters, default length 10, letters always enabled, optional digits and symbols. Every enabled optional class is guaranteed to appear.
 - **Memorable**: 3–6 offline words, default 4, optional capitalization, complete or four-character abbreviated words, and `-`, `.`, or `_` separators.
 - **PIN**: 4–12 decimal digits, default length 6.
-- **Input**: `UP`, `DOWN`, and `OK` only. `OK` enters or confirms editing, toggles Boolean values, or generates. Holding `UP` / `DOWN` continuously changes a numeric value while editing. Long-pressing `OK` cancels an edit and does nothing destructive on the normal screen.
-- **Feedback**: MoonBit generates the success chime's frequencies, durations, envelope, and PCM samples; the C audio task only performs non-blocking playback.
-- **Display**: a 240×320 dark cyberpunk interface with a 17px, 4bpp, strongly hinted CJK subset. A MoonBit view model owns parameter slots, focus, layout, strength color, and battery presentation policy.
-- **Core**: generation, unbiased indexes, output postconditions, entropy and strength, state transitions, view models, battery policy, and sound synthesis are implemented in MoonBit.
+- **Input**: `UP`, `DOWN`, and `OK` only. `OK` enters or confirms editing, toggles Boolean values, or generates. Holding `UP` / `DOWN` continuously changes a numeric value while editing. Long-pressing `OK` cancels an edit or opens Settings when the main screen is not editing.
+- **Feedback**: MoonBit generates the success chime's frequencies, durations, envelope, and PCM samples; the C audio task only performs non-blocking playback. The chime can be disabled in Settings.
+- **Display**: switchable 240×320 cyberpunk and blue-sky themes with a 17px, 4bpp, strongly hinted CJK subset. MoonBit view models own parameter slots, focus, layout, theme and settings state, strength color, and battery presentation policy.
+- **Core**: generation, unbiased indexes, output postconditions, entropy and strength, state transitions, settings input policy, view models, battery policy, and sound synthesis are implemented in MoonBit.
+
+## Settings and persistence
+
+- Long-press `OK` on the main screen while not editing to open Settings.
+- Use `UP` / `DOWN` to select **Theme** or **Sound**, press `OK` to change the selected value, and long-press `OK` to return.
+- **Theme** switches between the dark cyberpunk interface and the blue-sky, clouds, and grass interface.
+- **Sound** enables or disables the success chime without affecting password generation.
+- Theme and sound preferences are loaded from and asynchronously saved to ESP-IDF NVS. Generated passwords and password history are never persisted.
+- If NVS is unavailable, the selected values still apply for the current session and the firmware logs a warning. The application does not erase the NVS partition automatically.
 
 ## MoonBit-first implementation
 
-The repository now contains 1,630 production `.mbt` lines and 659 MoonBit test lines, 2,289 in total. Excluding tests, blank lines, and comments leaves 1,223 effective production MoonBit lines. `tools/check_repo.py` independently enforces at least 1,000 effective production lines; tests cannot satisfy that gate.
+The repository now contains 1,610 production `.mbt` lines and 702 MoonBit test lines, 2,312 in total. Excluding tests, blank lines, and comments leaves 1,361 effective production MoonBit lines. `tools/check_repo.py` independently enforces at least 1,000 effective production lines; tests cannot satisfy that gate.
 
 The production MoonBit modules are compiled into and called by the ESP-IDF firmware. They own:
 
@@ -26,11 +35,12 @@ The production MoonBit modules are compiled into and called by the ESP-IDF firmw
 - the RandomSource abstraction, rejection sampling, and generated-output postconditions;
 - parameter policies, entropy estimates, and strength classification;
 - NAVIGATION / EDITING transitions and configuration change detection;
+- settings focus, button-gesture mapping, theme selection, and sound policy;
 - parameter slot, coordinate, focus, editing, and value view models;
 - pure policy for resolving raw CW2017 readings into a display value;
 - success-note sequencing, attack/release envelopes, and PCM sample generation.
 
-C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readings, FreeRTOS scheduling, codec writes, the secure-random source, and Flash dictionary access.
+C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readings, FreeRTOS scheduling, the NVS persistence adapter, codec writes, the secure-random source, and Flash dictionary access.
 
 ## Upstream and attribution
 
@@ -110,6 +120,8 @@ python -m esptool --chip esp32c3 --baud 460800 \
 
 Alternatively, use the official AI Passport web flasher and select the same `-full.bin` file. Successful compilation or flashing is not evidence that the UI, buttons, fonts, power behavior, and RNG adapter have passed physical-device acceptance.
 
+Flashing the merged image at `0x0` can reset the NVS region. After initial provisioning, use segmented `idf.py flash` during development when existing theme and sound preferences must be preserved.
+
 ## Offline word list and fonts
 
 - The memorable mode bundles the 1,296-entry [EFF Short Wordlist for Passphrases #1](https://www.eff.org/files/2016/09/08/eff_short_wordlist_1.txt), attributed to the Electronic Frontier Foundation under CC BY 3.0 US. The tracked source SHA-256 is `8f5ca830b8bffb6fe39c9736c024a00a6a6411adb3f83a9be8bfeeb6e067ae69`.
@@ -127,4 +139,4 @@ Alternatively, use the official AI Passport web flasher and select the same `-fu
 
 ## Verification status
 
-Thirty-five MoonBit host tests, the effective production-MoonBit gate, repository checks, supporting Python/C host tests, and the ESP-IDF 5.5.3 build containing this iteration passed. The user confirmed that the previous CJK subset rendered but its strokes were too thin. The heavier subset, continuous battery-tracking fix, migrated MoonBit view/battery/sound logic, and success chime still require a device run. The first profile-only battery change looked correct at boot but later showed 77%, or 0% on an unplugged boot, so the current implementation also stops resetting the CW2017 on every application start.
+The current tree defines 44 MoonBit tests. MoonBit strict checking, the 1,361-line effective production gate, repository checks, 11 Python firmware-layout tests, and the ESP-IDF 5.5.3 firmware build and merged-image verification passed locally. The local native MoonBit test executable could not be built because the detected legacy Windows C compiler cannot find `stdint.h`; this is an environment failure, not a recorded test pass. The dual-theme Settings screen, preference persistence across reboot, sound toggle, fonts, buttons, battery behavior, and RNG adapter still require physical-device validation.

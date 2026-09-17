@@ -10,7 +10,7 @@
 #include "ui_pixel.h"
 
 enum {
-    OPTION_COUNT = 2,
+    OPTION_COUNT = 4,
     INPUT_UP = 0,
     INPUT_DOWN = 1,
     INPUT_OK = 2,
@@ -40,6 +40,13 @@ static const char *sound_text(bool enabled)
     return enabled ? "ON" : "OFF";
 }
 
+static const char *policy_text(int profile)
+{
+    static const char *names[] = {"Compat", "Standard", "Strict"};
+    return profile >= SETTINGS_POLICY_COMPATIBLE &&
+        profile <= SETTINGS_POLICY_STRICT ? names[profile] : names[1];
+}
+
 static void teardown(void)
 {
     if (s_screen) {
@@ -64,6 +71,14 @@ static void refresh_options(void)
         s_value_labels[1],
         sound_text(passport_moonbit_settings_sound_enabled(s_state) != 0)
     );
+    lv_label_set_text(
+        s_value_labels[2],
+        policy_text(passport_moonbit_settings_policy_profile(s_state))
+    );
+    lv_label_set_text(
+        s_value_labels[3],
+        sound_text(passport_moonbit_settings_exclude_ambiguous(s_state) != 0)
+    );
     for (int i = 0; i < OPTION_COUNT; i++) {
         bool focused = i == selected;
         lv_obj_set_style_bg_color(
@@ -83,7 +98,9 @@ static void refresh_options(void)
 
 static void build(void)
 {
-    static const char *names[OPTION_COUNT] = {"Theme", "Sound"};
+    static const char *names[OPTION_COUNT] = {
+        "Theme", "Sound", "Policy", "Clear chars"
+    };
     lv_obj_t *old_screen = s_screen;
 
     s_screen = NULL;
@@ -93,7 +110,7 @@ static void build(void)
     s_screen = ui_pixel_screen_create_with_font("Settings", &lv_font_montserrat_20);
 
     for (int i = 0; i < OPTION_COUNT; i++) {
-        s_panels[i] = ui_pixel_panel_create(s_screen, 7, 60 + i * 66, 226, 52, UI_PAPER);
+        s_panels[i] = ui_pixel_panel_create(s_screen, 7, 50 + i * 51, 226, 43, UI_PAPER);
         s_name_labels[i] = ui_pixel_label(
             s_panels[i], names[i], &lv_font_montserrat_14, UI_TEXT
         );
@@ -107,7 +124,7 @@ static void build(void)
     lv_obj_t *hint = ui_pixel_label(
         s_screen, "OK: change   LONG: back", &lv_font_montserrat_14, UI_TEXT
     );
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -12);
 
     refresh_options();
     lv_screen_load(s_screen);
@@ -119,7 +136,9 @@ bool settings_screen_enter(settings_screen_on_exit_t on_exit)
     s_on_exit = on_exit;
     s_state = passport_moonbit_settings_initial(
         settings_store_theme(),
-        settings_store_sound_enabled() ? 1 : 0
+        settings_store_sound_enabled() ? 1 : 0,
+        settings_store_policy_profile(),
+        settings_store_exclude_ambiguous() ? 1 : 0
     );
     if (!bsp_lvgl_lock(500)) {
         s_on_exit = NULL;
@@ -139,6 +158,12 @@ static void apply_input(int input)
     bool previous_sound =
         passport_moonbit_settings_sound_enabled(previous) != 0;
     bool next_sound = passport_moonbit_settings_sound_enabled(s_state) != 0;
+    int previous_policy = passport_moonbit_settings_policy_profile(previous);
+    int next_policy = passport_moonbit_settings_policy_profile(s_state);
+    bool previous_exclude =
+        passport_moonbit_settings_exclude_ambiguous(previous) != 0;
+    bool next_exclude =
+        passport_moonbit_settings_exclude_ambiguous(s_state) != 0;
 
     if (previous_theme != next_theme) {
         (void)settings_store_set_theme(next_theme);
@@ -150,6 +175,12 @@ static void apply_input(int input)
     }
     if (previous_sound != next_sound) {
         (void)settings_store_set_sound(next_sound);
+    }
+    if (previous_policy != next_policy) {
+        (void)settings_store_set_policy_profile(next_policy);
+    }
+    if (previous_exclude != next_exclude) {
+        (void)settings_store_set_exclude_ambiguous(next_exclude);
     }
     if (bsp_lvgl_lock(500)) {
         refresh_options();

@@ -17,8 +17,10 @@
 LV_FONT_DECLARE(passport_font_zh_16);
 
 enum {
+    FIELD_MODE = 0,
     FIELD_RESULT = 11,
     FIELD_EDITING = 2,
+    FIELD_POLICY_PROFILE = 14,
 };
 
 enum {
@@ -207,16 +209,35 @@ static void refresh_parameters(void)
 static void refresh_result(void)
 {
     int result = state_value(FIELD_RESULT);
+    int warning = passport_moonbit_security_warning(s_state);
+    static const char *profile_names[] = {"兼容", "标准", "严格"};
+    static const char *warning_names[] = {
+        "", "长度过短", "缺少小写", "缺少大写", "缺少数字", "缺少符号", "配置无效"
+    };
     if (result == RESULT_FAILURE) {
         lv_label_set_text(s_status_label, "生成失败 请重试");
+        lv_obj_set_style_text_color(s_status_label, lv_color_hex(UI_RED), 0);
         lv_label_set_text(s_result_label, "");
         return;
     }
+    if (state_value(FIELD_MODE) == 0) {
+        int profile = state_value(FIELD_POLICY_PROFILE);
+        const char *profile_name = profile >= 0 && profile < 3
+            ? profile_names[profile] : profile_names[1];
+        if (warning > 0 && warning < 7) {
+            lv_label_set_text_fmt(s_status_label, "%s %s", profile_name, warning_names[warning]);
+            lv_obj_set_style_text_color(s_status_label, lv_color_hex(UI_ORANGE), 0);
+        } else {
+            lv_label_set_text_fmt(s_status_label, "策略 %s", profile_name);
+            lv_obj_set_style_text_color(s_status_label, lv_color_hex(UI_LIME), 0);
+        }
+    } else {
+        lv_label_set_text(s_status_label, result == RESULT_SUCCESS ? "已生成" : "");
+        lv_obj_set_style_text_color(s_status_label, lv_color_hex(UI_LIME), 0);
+    }
     if (result == RESULT_SUCCESS) {
-        lv_label_set_text(s_status_label, "已生成");
         lv_label_set_text(s_result_label, password_platform_output());
     } else {
-        lv_label_set_text(s_status_label, "");
         lv_label_set_text(s_result_label, "OK -> Generate");
     }
 }
@@ -326,6 +347,7 @@ static void password_app_build_ui(void)
     lv_obj_t *result_panel = ui_pixel_panel_create(s_screen, 7, 174, 226, 73, UI_PAPER);
     s_status_label = ui_pixel_label(result_panel, "", &passport_font_zh_16, UI_LIME);
     lv_obj_set_pos(s_status_label, 0, -2);
+    lv_obj_set_width(s_status_label, 108);
     s_entropy_label = ui_pixel_label(result_panel, "", &lv_font_montserrat_14, UI_SKY_DARK);
     lv_obj_set_pos(s_entropy_label, 111, -1);
     lv_obj_set_width(s_entropy_label, 99);
@@ -352,7 +374,16 @@ static void password_app_build_ui(void)
 static bool on_settings_exit(void)
 {
     if (!bsp_lvgl_lock(500)) return false;
+    uint64_t previous = s_state;
     s_state = passport_moonbit_with_theme(s_state, settings_store_theme());
+    s_state = passport_moonbit_with_policy_settings(
+        s_state,
+        settings_store_policy_profile(),
+        settings_store_exclude_ambiguous() ? 1 : 0
+    );
+    if (passport_moonbit_configuration_changed(previous, s_state)) {
+        password_platform_clear_output();
+    }
     password_app_build_ui();
     bsp_lvgl_unlock();
     s_in_settings = false;
@@ -364,6 +395,11 @@ void password_app_enter(void)
     s_in_settings = false;
     s_state = passport_moonbit_initial_state();
     s_state = passport_moonbit_with_theme(s_state, settings_store_theme());
+    s_state = passport_moonbit_with_policy_settings(
+        s_state,
+        settings_store_policy_profile(),
+        settings_store_exclude_ambiguous() ? 1 : 0
+    );
     password_platform_clear_output();
     password_app_build_ui();
 }

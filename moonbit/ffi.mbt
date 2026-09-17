@@ -80,6 +80,16 @@ pub fn passport_moonbit_with_policy_profile(
 }
 
 ///|
+#export_name("passport_moonbit_with_policy_settings")
+pub fn passport_moonbit_with_policy_settings(
+  state : UInt64,
+  profile : Int,
+  exclude_ambiguous : Int,
+) -> UInt64 {
+  with_policy_settings(state, profile, exclude_ambiguous)
+}
+
+///|
 #export_name("passport_moonbit_handle_input")
 pub fn passport_moonbit_handle_input(state : UInt64, input : Int) -> UInt64 {
   apply_input(state, input)
@@ -310,8 +320,10 @@ pub fn passport_moonbit_with_theme(state : UInt64, theme : Int) -> UInt64 {
 pub fn passport_moonbit_settings_initial(
   theme : Int,
   sound_enabled : Int,
+  policy_profile : Int,
+  exclude_ambiguous : Int,
 ) -> UInt64 {
-  settings_initial(theme, sound_enabled)
+  settings_initial(theme, sound_enabled, policy_profile, exclude_ambiguous)
 }
 
 ///|
@@ -348,6 +360,18 @@ pub fn passport_moonbit_settings_theme(state : UInt64) -> Int {
 #export_name("passport_moonbit_settings_sound_enabled")
 pub fn passport_moonbit_settings_sound_enabled(state : UInt64) -> Int {
   settings_sound_enabled(state)
+}
+
+///|
+#export_name("passport_moonbit_settings_policy_profile")
+pub fn passport_moonbit_settings_policy_profile(state : UInt64) -> Int {
+  settings_policy_profile(state)
+}
+
+///|
+#export_name("passport_moonbit_settings_exclude_ambiguous")
+pub fn passport_moonbit_settings_exclude_ambiguous(state : UInt64) -> Int {
+  settings_exclude_ambiguous(state)
 }
 
 ///|

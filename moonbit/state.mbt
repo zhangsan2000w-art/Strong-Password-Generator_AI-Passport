@@ -321,6 +321,30 @@ pub fn record_generation_result(state : UInt64, result : Int) -> UInt64 {
 }
 
 ///|
+pub fn with_policy_settings(
+  state : UInt64,
+  profile : Int,
+  exclude_ambiguous : Int,
+) -> UInt64 {
+  let profile_state = with_policy_profile(state, profile)
+  let next = set_field(
+    profile_state,
+    exclude_ambiguous_shift,
+    1,
+    if exclude_ambiguous != 0 {
+      1
+    } else {
+      0
+    },
+  )
+  if configuration_changed(state, next) {
+    clear_generation_result(next)
+  } else {
+    next
+  }
+}
+
+///|
 pub fn apply_input(state : UInt64, input : Int) -> UInt64 {
   let next = handle_input(state, input)
   if configuration_changed(state, next) {

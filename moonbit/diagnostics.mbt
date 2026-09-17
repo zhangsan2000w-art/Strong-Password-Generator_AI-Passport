@@ -20,6 +20,9 @@ pub let diagnostic_failure_unsafe_symbol : Int = 5
 pub let diagnostic_failure_character : Int = 6
 
 ///|
+pub let diagnostic_failure_cancelled : Int = 7
+
+///|
 pub let diagnostic_status_running : Int = 0
 
 ///|
@@ -27,6 +30,9 @@ pub let diagnostic_status_passed : Int = 1
 
 ///|
 pub let diagnostic_status_failed : Int = 2
+
+///|
+pub let diagnostic_status_cancelled : Int = 3
 
 ///|
 pub let diagnostic_default_samples : Int = 32
@@ -75,6 +81,12 @@ fn diagnostic_set_field(
 ///|
 pub fn diagnostic_observation_initial() -> UInt64 {
   0UL
+}
+
+///|
+pub fn diagnostic_policy_state(state : UInt64) -> UInt64 {
+  let random_state = set_field(state, mode_shift, 3, 0)
+  clear_generation_result(random_state)
 }
 
 ///|
@@ -239,8 +251,21 @@ pub fn diagnostic_record_sample(
 }
 
 ///|
+pub fn diagnostic_cancel_run(run : UInt64) -> UInt64 {
+  if diagnostic_run_status(run) == diagnostic_status_running {
+    diagnostic_set_field(
+      run, run_failure_shift, 15, diagnostic_failure_cancelled,
+    )
+  } else {
+    run
+  }
+}
+
+///|
 pub fn diagnostic_run_status(run : UInt64) -> Int {
-  if diagnostic_run_completed(run) < diagnostic_run_target(run) {
+  if diagnostic_run_failure(run) == diagnostic_failure_cancelled {
+    diagnostic_status_cancelled
+  } else if diagnostic_run_completed(run) < diagnostic_run_target(run) {
     diagnostic_status_running
   } else if diagnostic_run_failure(run) == diagnostic_sample_ok &&
     diagnostic_run_passed(run) == diagnostic_run_target(run) {

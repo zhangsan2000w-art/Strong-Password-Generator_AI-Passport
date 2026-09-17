@@ -23,6 +23,12 @@ pub fn passport_moonbit_diagnostic_observation_initial() -> UInt64 {
 }
 
 ///|
+#export_name("passport_moonbit_diagnostic_policy_state")
+pub fn passport_moonbit_diagnostic_policy_state(state : UInt64) -> UInt64 {
+  diagnostic_policy_state(state)
+}
+
+///|
 #export_name("passport_moonbit_diagnostic_observe_character")
 pub fn passport_moonbit_diagnostic_observe_character(
   policy_state : UInt64,
@@ -47,6 +53,12 @@ pub fn passport_moonbit_diagnostic_record_sample(
   generation_result : Int,
 ) -> UInt64 {
   diagnostic_record_sample(run, policy_state, observation, generation_result)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_cancel_run")
+pub fn passport_moonbit_diagnostic_cancel_run(run : UInt64) -> UInt64 {
+  diagnostic_cancel_run(run)
 }
 
 ///|
@@ -411,6 +423,12 @@ pub fn passport_moonbit_settings_map_button_event(
 #export_name("passport_moonbit_settings_selected")
 pub fn passport_moonbit_settings_selected(state : UInt64) -> Int {
   settings_selected(state)
+}
+
+///|
+#export_name("passport_moonbit_settings_action")
+pub fn passport_moonbit_settings_action(state : UInt64) -> Int {
+  settings_action(state)
 }
 
 ///|

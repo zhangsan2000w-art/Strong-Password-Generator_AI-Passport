@@ -4,16 +4,19 @@
 let settings_selected_shift : Int = 0
 
 ///|
-let settings_theme_shift : Int = 2
+let settings_theme_shift : Int = 3
 
 ///|
-let settings_sound_shift : Int = 3
+let settings_sound_shift : Int = 4
 
 ///|
-let settings_policy_profile_shift : Int = 4
+let settings_policy_profile_shift : Int = 5
 
 ///|
-let settings_exclude_ambiguous_shift : Int = 6
+let settings_exclude_ambiguous_shift : Int = 7
+
+///|
+let settings_action_shift : Int = 8
 
 ///|
 pub let settings_option_theme : Int = 0
@@ -28,7 +31,16 @@ pub let settings_option_policy_profile : Int = 2
 pub let settings_option_exclude_ambiguous : Int = 3
 
 ///|
-pub let settings_option_count : Int = 4
+pub let settings_option_self_check : Int = 4
+
+///|
+pub let settings_option_count : Int = 5
+
+///|
+pub let settings_action_none : Int = 0
+
+///|
+pub let settings_action_start_self_check : Int = 1
 
 ///|
 fn settings_field(state : UInt64, shift : Int, mask : Int) -> Int {
@@ -94,19 +106,22 @@ pub fn settings_initial(
 }
 
 ///|
-pub fn settings_handle_input(state : UInt64, input : Int) -> UInt64 {
+pub fn settings_handle_input(original : UInt64, input : Int) -> UInt64 {
+  let state = settings_set_field(
+    original, settings_action_shift, 3, settings_action_none,
+  )
   if input == input_up || input == input_down {
-    let selected = settings_field(state, settings_selected_shift, 3)
+    let selected = settings_field(state, settings_selected_shift, 7)
     let delta = if input == input_up { settings_option_count - 1 } else { 1 }
     return settings_set_field(
       state,
       settings_selected_shift,
-      3,
+      7,
       (selected + delta) % settings_option_count,
     )
   }
   if input == input_ok {
-    let selected = settings_field(state, settings_selected_shift, 3)
+    let selected = settings_field(state, settings_selected_shift, 7)
     if selected == settings_option_theme {
       return settings_set_field(
         state,
@@ -130,6 +145,11 @@ pub fn settings_handle_input(state : UInt64, input : Int) -> UInt64 {
         3,
         (settings_field(state, settings_policy_profile_shift, 3) + 1) %
         policy_profile_count,
+      )
+    }
+    if selected == settings_option_self_check {
+      return settings_set_field(
+        state, settings_action_shift, 3, settings_action_start_self_check,
       )
     }
     return settings_set_field(
@@ -164,7 +184,12 @@ pub fn settings_map_button_event(button : Int, event : Int) -> Int {
 
 ///|
 pub fn settings_selected(state : UInt64) -> Int {
-  settings_field(state, settings_selected_shift, 3)
+  settings_field(state, settings_selected_shift, 7)
+}
+
+///|
+pub fn settings_action(state : UInt64) -> Int {
+  settings_field(state, settings_action_shift, 3)
 }
 
 ///|

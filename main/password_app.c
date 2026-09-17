@@ -417,7 +417,7 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
 
     bool editing = state_value(FIELD_EDITING) != 0;
     if (!editing && button == BSP_BTN_OK && event == BSP_BTN_LONG) {
-        if (settings_screen_enter(on_settings_exit)) {
+        if (settings_screen_enter(s_state, on_settings_exit)) {
             s_in_settings = true;
             if (bsp_lvgl_lock(500)) {
                 password_app_teardown_ui();

@@ -20,6 +20,16 @@ test "diagnostics accepts a compliant compatible sample" {
 }
 
 ///|
+test "diagnostics always evaluates the random-password policy" {
+  let mut memorable = initial_state()
+  memorable = handle_input(memorable, input_down)
+  @test.assert_eq(state_get(memorable, state_field_mode), 1)
+  let diagnostic = diagnostic_policy_state(memorable)
+  @test.assert_eq(state_get(diagnostic, state_field_mode), 0)
+  @test.assert_eq(state_get(diagnostic, state_field_result), result_empty)
+}
+
+///|
 test "diagnostics distinguishes output constraint failures" {
   let policy = with_policy_profile(initial_state(), policy_profile_standard)
   let valid = observe_codes(policy, [
@@ -99,4 +109,17 @@ test "diagnostic target is bounded for on-device work" {
     diagnostic_run_target(diagnostic_run_initial(diagnostic_default_samples)),
     diagnostic_default_samples,
   )
+}
+
+///|
+test "diagnostic cancellation preserves completed progress" {
+  let run = diagnostic_run_initial(32)
+  let cancelled = diagnostic_cancel_run(run)
+  @test.assert_eq(diagnostic_run_status(cancelled), diagnostic_status_cancelled)
+  @test.assert_eq(diagnostic_run_completed(cancelled), 0)
+  @test.assert_eq(
+    diagnostic_run_failure(cancelled),
+    diagnostic_failure_cancelled,
+  )
+  @test.assert_eq(diagnostic_cancel_run(cancelled), cancelled)
 }

@@ -8,9 +8,11 @@ extern "C" {
 
 void moonbit_init(void);
 uint64_t passport_moonbit_diagnostic_observation_initial(void);
+uint64_t passport_moonbit_diagnostic_policy_state(uint64_t state);
 uint64_t passport_moonbit_diagnostic_observe_character(uint64_t policy_state, uint64_t observation, int32_t character);
 uint64_t passport_moonbit_diagnostic_run_initial(int32_t target);
 uint64_t passport_moonbit_diagnostic_record_sample(uint64_t run, uint64_t policy_state, uint64_t observation, int32_t generation_result);
+uint64_t passport_moonbit_diagnostic_cancel_run(uint64_t run);
 int32_t passport_moonbit_diagnostic_run_target(uint64_t run);
 int32_t passport_moonbit_diagnostic_run_completed(uint64_t run);
 int32_t passport_moonbit_diagnostic_run_passed(uint64_t run);
@@ -54,6 +56,7 @@ uint64_t passport_moonbit_settings_initial(int32_t theme, int32_t sound_enabled,
 uint64_t passport_moonbit_settings_handle_input(uint64_t state, int32_t input);
 int32_t passport_moonbit_settings_map_button_event(int32_t button, int32_t event);
 int32_t passport_moonbit_settings_selected(uint64_t state);
+int32_t passport_moonbit_settings_action(uint64_t state);
 int32_t passport_moonbit_settings_theme(uint64_t state);
 int32_t passport_moonbit_settings_sound_enabled(uint64_t state);
 int32_t passport_moonbit_settings_policy_profile(uint64_t state);

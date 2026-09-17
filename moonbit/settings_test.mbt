@@ -12,7 +12,7 @@ test "settings normalizes persisted values" {
 test "settings navigation wraps across all options" {
   let initial = settings_initial(theme_cyber, 1, policy_profile_standard, 1)
   let up = settings_handle_input(initial, input_up)
-  @test.assert_eq(settings_selected(up), settings_option_exclude_ambiguous)
+  @test.assert_eq(settings_selected(up), settings_option_self_check)
   let down = settings_handle_input(up, input_down)
   @test.assert_eq(settings_selected(down), settings_option_theme)
   let sound = settings_handle_input(down, input_down)
@@ -48,6 +48,16 @@ test "settings ignores unsupported input" {
   let initial = settings_initial(theme_sky, 0, policy_profile_strict, 0)
   @test.assert_eq(settings_handle_input(initial, input_ok_long), initial)
   @test.assert_eq(settings_handle_input(initial, 99), initial)
+}
+
+///|
+test "settings emits a one-shot self-check action" {
+  let initial = settings_initial(theme_cyber, 1, policy_profile_standard, 1)
+  let self_check = settings_handle_input(initial, input_up)
+  let requested = settings_handle_input(self_check, input_ok)
+  @test.assert_eq(settings_action(requested), settings_action_start_self_check)
+  let cleared = settings_handle_input(requested, 99)
+  @test.assert_eq(settings_action(cleared), settings_action_none)
 }
 
 ///|

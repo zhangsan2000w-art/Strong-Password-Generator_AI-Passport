@@ -5,7 +5,7 @@
 pub let view_mode_count : Int = 3
 
 ///|
-pub let view_parameter_slots : Int = 4
+pub let view_parameter_slots : Int = 5
 
 ///|
 pub let parameter_hidden : Int = 0
@@ -14,28 +14,31 @@ pub let parameter_hidden : Int = 0
 pub let parameter_random_length : Int = 1
 
 ///|
-pub let parameter_letters : Int = 2
+pub let parameter_lowercase : Int = 2
 
 ///|
-pub let parameter_digits : Int = 3
+pub let parameter_uppercase : Int = 3
 
 ///|
-pub let parameter_symbols : Int = 4
+pub let parameter_digits : Int = 4
 
 ///|
-pub let parameter_word_count : Int = 5
+pub let parameter_symbols : Int = 5
 
 ///|
-pub let parameter_capitalize : Int = 6
+pub let parameter_word_count : Int = 6
 
 ///|
-pub let parameter_complete_word : Int = 7
+pub let parameter_capitalize : Int = 7
 
 ///|
-pub let parameter_separator : Int = 8
+pub let parameter_complete_word : Int = 8
 
 ///|
-pub let parameter_pin_length : Int = 9
+pub let parameter_separator : Int = 9
+
+///|
+pub let parameter_pin_length : Int = 10
 
 ///|
 pub fn view_mode_valid(mode : Int) -> Bool {
@@ -56,9 +59,10 @@ pub fn view_parameter_kind(mode : Int, slot : Int) -> Int {
     0 =>
       match slot {
         0 => parameter_random_length
-        1 => parameter_letters
-        2 => parameter_digits
-        3 => parameter_symbols
+        1 => parameter_lowercase
+        2 => parameter_uppercase
+        3 => parameter_digits
+        4 => parameter_symbols
         _ => parameter_hidden
       }
     1 =>
@@ -84,14 +88,15 @@ pub fn view_parameter_focus(mode : Int, slot : Int) -> Int {
   let kind = view_parameter_kind(mode, slot)
   match kind {
     1 => 1
-    2 => 0 // Letters are mandatory, so this row is informational.
-    3 => 2
-    4 => 3
-    5 => 1
-    6 => 2
-    7 => 3
-    8 => 4
-    9 => 1
+    2 => 2
+    3 => 3
+    4 => 4
+    5 => 5
+    6 => 1
+    7 => 2
+    8 => 3
+    9 => 4
+    10 => 1
     _ => 0
   }
 }
@@ -101,14 +106,15 @@ pub fn view_parameter_value(state : UInt64, slot : Int) -> Int {
   let mode = state_get(state, state_field_mode)
   match view_parameter_kind(mode, slot) {
     1 => state_get(state, state_field_random_length)
-    2 => 1
-    3 => state_get(state, state_field_digits)
-    4 => state_get(state, state_field_symbols)
-    5 => state_get(state, state_field_word_count)
-    6 => state_get(state, state_field_capitalize)
-    7 => state_get(state, state_field_complete_word)
-    8 => state_get(state, state_field_separator)
-    9 => state_get(state, state_field_pin_length)
+    2 => state_get(state, state_field_lowercase)
+    3 => state_get(state, state_field_uppercase)
+    4 => state_get(state, state_field_digits)
+    5 => state_get(state, state_field_symbols)
+    6 => state_get(state, state_field_word_count)
+    7 => state_get(state, state_field_capitalize)
+    8 => state_get(state, state_field_complete_word)
+    9 => state_get(state, state_field_separator)
+    10 => state_get(state, state_field_pin_length)
     _ => -1
   }
 }
@@ -120,6 +126,12 @@ pub fn view_parameter_x(mode : Int, slot : Int) -> Int {
   }
   if mode == 2 {
     54
+  } else if mode == 0 {
+    if slot % 2 == 0 {
+      2
+    } else {
+      106
+    }
   } else if slot % 2 == 0 {
     2
   } else {
@@ -134,6 +146,8 @@ pub fn view_parameter_y(mode : Int, slot : Int) -> Int {
   }
   if mode == 2 {
     18
+  } else if mode == 0 {
+    2 + slot / 2 * 25
   } else if slot < 2 {
     2
   } else {
@@ -153,7 +167,11 @@ pub fn view_parameter_width(mode : Int, slot : Int) -> Int {
 ///|
 pub fn view_parameter_height(mode : Int, slot : Int) -> Int {
   if view_parameter_visible(mode, slot) {
-    27
+    if mode == 0 {
+      22
+    } else {
+      27
+    }
   } else {
     0
   }

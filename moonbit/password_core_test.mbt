@@ -410,17 +410,20 @@ test "state switches modes edits toggles generates and regenerates" {
   state = handle_input(state, input_down)
   @test.assert_eq(state_get(state, state_field_focus), 2)
   state = handle_input(state, input_ok)
-  @test.assert_eq(state_get(state, state_field_digits), 0)
-  state = handle_input(state, input_down)
-  state = handle_input(state, input_down)
-  @test.assert_eq(state_get(state, state_field_focus), 4)
+  @test.assert_eq(state_get(state, state_field_lowercase), 0)
+  let mut navigation_steps = 0
+  while navigation_steps < 4 {
+    state = handle_input(state, input_down)
+    navigation_steps = navigation_steps + 1
+  }
+  @test.assert_eq(state_get(state, state_field_focus), 6)
   state = handle_input(state, input_ok)
   @test.assert_eq(state_action(state), action_generate)
   state = handle_input(state, input_ok)
   @test.assert_eq(state_action(state), action_generate)
   state = handle_input(state, input_ok_long)
   @test.assert_eq(state_action(state), action_none)
-  @test.assert_eq(state_get(state, state_field_focus), 4)
+  @test.assert_eq(state_get(state, state_field_focus), 6)
 }
 
 ///|

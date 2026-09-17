@@ -38,20 +38,21 @@ enum {
 enum {
     PARAMETER_HIDDEN = 0,
     PARAMETER_RANDOM_LENGTH = 1,
-    PARAMETER_LETTERS = 2,
-    PARAMETER_DIGITS = 3,
-    PARAMETER_SYMBOLS = 4,
-    PARAMETER_WORD_COUNT = 5,
-    PARAMETER_CAPITALIZE = 6,
-    PARAMETER_COMPLETE_WORD = 7,
-    PARAMETER_SEPARATOR = 8,
-    PARAMETER_PIN_LENGTH = 9,
+    PARAMETER_LOWERCASE = 2,
+    PARAMETER_UPPERCASE = 3,
+    PARAMETER_DIGITS = 4,
+    PARAMETER_SYMBOLS = 5,
+    PARAMETER_WORD_COUNT = 6,
+    PARAMETER_CAPITALIZE = 7,
+    PARAMETER_COMPLETE_WORD = 8,
+    PARAMETER_SEPARATOR = 9,
+    PARAMETER_PIN_LENGTH = 10,
 };
 
 static lv_obj_t *s_screen;
 static lv_obj_t *s_mode_panels[3];
 static lv_obj_t *s_mode_labels[3];
-static lv_obj_t *s_parameter_labels[4];
+static lv_obj_t *s_parameter_labels[5];
 static lv_obj_t *s_status_label;
 static lv_obj_t *s_entropy_label;
 static lv_obj_t *s_result_label;
@@ -160,7 +161,7 @@ static void refresh_battery(lv_timer_t *timer)
 static void refresh_parameters(void)
 {
     static const char *separator_text[] = {"-", ".", "_"};
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         lv_obj_add_flag(s_parameter_labels[i], LV_OBJ_FLAG_HIDDEN);
         set_focus_style(s_parameter_labels[i], false, false);
         int kind = passport_moonbit_view_parameter_kind(s_state, i);
@@ -171,8 +172,11 @@ static void refresh_parameters(void)
         case PARAMETER_RANDOM_LENGTH:
             lv_label_set_text_fmt(s_parameter_labels[i], "长度 %d", value);
             break;
-        case PARAMETER_LETTERS:
-            lv_label_set_text(s_parameter_labels[i], "字母 ON");
+        case PARAMETER_LOWERCASE:
+            lv_label_set_text_fmt(s_parameter_labels[i], "小写 %s", value ? "ON" : "OFF");
+            break;
+        case PARAMETER_UPPERCASE:
+            lv_label_set_text_fmt(s_parameter_labels[i], "大写 %s", value ? "ON" : "OFF");
             break;
         case PARAMETER_DIGITS:
             lv_label_set_text_fmt(s_parameter_labels[i], "数字 %s", value ? "ON" : "OFF");
@@ -298,7 +302,7 @@ static void password_app_teardown_ui(void)
         s_mode_panels[i] = NULL;
         s_mode_labels[i] = NULL;
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         s_parameter_labels[i] = NULL;
     }
 }
@@ -338,7 +342,7 @@ static void password_app_build_ui(void)
     }
 
     lv_obj_t *parameter_panel = ui_pixel_panel_create(s_screen, 7, 89, 226, 76, UI_PAPER);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         s_parameter_labels[i] = ui_pixel_label(
             parameter_panel, "", &passport_font_zh_16, UI_TEXT
         );

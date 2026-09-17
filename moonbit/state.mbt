@@ -326,7 +326,13 @@ pub fn with_policy_settings(
   profile : Int,
   exclude_ambiguous : Int,
 ) -> UInt64 {
-  let profile_state = with_policy_profile(state, profile)
+  let normalized = normalize_policy_profile(profile)
+  let profile_state = if state_get(state, state_field_policy_profile) ==
+    normalized {
+    state
+  } else {
+    with_policy_profile(state, normalized)
+  }
   let next = set_field(
     profile_state,
     exclude_ambiguous_shift,
@@ -357,7 +363,7 @@ pub fn apply_input(state : UInt64, input : Int) -> UInt64 {
 ///|
 pub fn mode_max_focus(mode : Int) -> Int {
   match mode {
-    0 => 4
+    0 => 6
     1 => 5
     _ => 2
   }
@@ -383,7 +389,7 @@ fn is_editable(mode : Int, focus : Int) -> Bool {
 
 ///|
 fn is_toggle(mode : Int, focus : Int) -> Bool {
-  (mode == 0 && (focus == 2 || focus == 3)) ||
+  (mode == 0 && focus >= 2 && focus <= 5) ||
   (mode == 1 && (focus == 2 || focus == 3))
 }
 
@@ -507,12 +513,28 @@ pub fn handle_input(original : UInt64, input : Int) -> UInt64 {
     if mode == 0 && focus == 2 {
       return set_field(
         state,
+        lowercase_shift,
+        1,
+        1 - state_get(state, state_field_lowercase),
+      )
+    }
+    if mode == 0 && focus == 3 {
+      return set_field(
+        state,
+        uppercase_shift,
+        1,
+        1 - state_get(state, state_field_uppercase),
+      )
+    }
+    if mode == 0 && focus == 4 {
+      return set_field(
+        state,
         digits_shift,
         1,
         1 - state_get(state, state_field_digits),
       )
     }
-    if mode == 0 && focus == 3 {
+    if mode == 0 && focus == 5 {
       return set_field(
         state,
         symbols_shift,

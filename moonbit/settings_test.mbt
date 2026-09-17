@@ -85,3 +85,20 @@ test "app policy settings clear stale generation results" {
   @test.assert_eq(state_get(applied, state_field_exclude_ambiguous), 0)
   @test.assert_eq(state_get(applied, state_field_result), result_empty)
 }
+
+///|
+test "unchanged profile preserves session character overrides" {
+  let custom = with_random_policy_options(
+    initial_state(),
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+  )
+  let applied = with_policy_settings(custom, policy_profile_standard, 0)
+  @test.assert_eq(state_get(applied, state_field_lowercase), 0)
+  @test.assert_eq(state_get(applied, state_field_uppercase), 1)
+  @test.assert_eq(state_get(applied, state_field_exclude_ambiguous), 0)
+}

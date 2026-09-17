@@ -10,16 +10,18 @@ fn state_for_mode(mode : Int) -> UInt64 {
 }
 
 ///|
-test "Random view exposes four product parameter slots" {
+test "Random view exposes granular character controls" {
   let state = state_for_mode(0)
   @test.assert_eq(view_parameter_kind(0, 0), parameter_random_length)
-  @test.assert_eq(view_parameter_kind(0, 1), parameter_letters)
-  @test.assert_eq(view_parameter_kind(0, 2), parameter_digits)
-  @test.assert_eq(view_parameter_kind(0, 3), parameter_symbols)
+  @test.assert_eq(view_parameter_kind(0, 1), parameter_lowercase)
+  @test.assert_eq(view_parameter_kind(0, 2), parameter_uppercase)
+  @test.assert_eq(view_parameter_kind(0, 3), parameter_digits)
+  @test.assert_eq(view_parameter_kind(0, 4), parameter_symbols)
   @test.assert_eq(view_parameter_value(state, 0), 16)
   @test.assert_eq(view_parameter_value(state, 1), 1)
   @test.assert_eq(view_parameter_value(state, 2), 1)
   @test.assert_eq(view_parameter_value(state, 3), 1)
+  @test.assert_eq(view_parameter_value(state, 4), 1)
 }
 
 ///|
@@ -50,7 +52,9 @@ test "view layout matches the 240x320 parameter grid" {
   @test.assert_eq(view_parameter_x(0, 0), 2)
   @test.assert_eq(view_parameter_x(0, 1), 106)
   @test.assert_eq(view_parameter_y(0, 0), 2)
-  @test.assert_eq(view_parameter_y(0, 2), 34)
+  @test.assert_eq(view_parameter_y(0, 2), 27)
+  @test.assert_eq(view_parameter_y(0, 4), 52)
+  @test.assert_eq(view_parameter_height(0, 4), 22)
   @test.assert_eq(view_parameter_width(1, 3), 100)
   @test.assert_eq(view_parameter_height(1, 3), 27)
   @test.assert_eq(view_parameter_x(2, 0), 54)
@@ -76,7 +80,7 @@ test "generate focus is mode-specific" {
   let mut random = initial_state()
   random = handle_input(random, input_ok)
   let mut step = 0
-  while step < 3 {
+  while step < 5 {
     random = handle_input(random, input_down)
     step = step + 1
   }

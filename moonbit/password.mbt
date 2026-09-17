@@ -15,25 +15,68 @@ pub fn generate_random_password(
   digits : Bool,
   symbols : Bool,
 ) -> Int {
-  if length < random_min_length || length > random_max_length {
+  generate_random_password_with_policy(
+    next_u32, emit, length, true, true, digits, symbols, false, false,
+  )
+}
+
+///|
+pub fn generate_random_password_with_policy(
+  next_u32 : () -> UInt,
+  emit : (Int) -> Bool,
+  length : Int,
+  lowercase : Bool,
+  uppercase : Bool,
+  digits : Bool,
+  symbols : Bool,
+  exclude_ambiguous : Bool,
+  safe_symbols_only : Bool,
+) -> Int {
+  if !random_policy_valid(length, lowercase, uppercase, digits, symbols) {
     return generate_invalid_config
   }
   let output = FixedArray::make(length, 0)
   let mut cursor = 0
+  if lowercase {
+    output[cursor] = lowercase_at(
+      unbiased_index(next_u32, lowercase_count(exclude_ambiguous)),
+      exclude_ambiguous,
+    )
+    cursor = cursor + 1
+  }
+  if uppercase {
+    output[cursor] = uppercase_at(
+      unbiased_index(next_u32, uppercase_count(exclude_ambiguous)),
+      exclude_ambiguous,
+    )
+    cursor = cursor + 1
+  }
   if digits {
-    output[cursor] = 48 + unbiased_index(next_u32, 10)
+    output[cursor] = digit_at(
+      unbiased_index(next_u32, digit_count(exclude_ambiguous)),
+      exclude_ambiguous,
+    )
     cursor = cursor + 1
   }
   if symbols {
-    output[cursor] = symbol_at(unbiased_index(next_u32, symbol_count))
+    output[cursor] = policy_symbol_at(
+      unbiased_index(next_u32, policy_symbol_count(safe_symbols_only)),
+      safe_symbols_only,
+    )
     cursor = cursor + 1
   }
-  let pool_size = random_pool_size(digits, symbols)
+  let pool_size = random_pool_size(
+    lowercase, uppercase, digits, symbols, exclude_ambiguous, safe_symbols_only,
+  )
   while cursor < length {
     output[cursor] = random_pool_at(
       unbiased_index(next_u32, pool_size),
+      lowercase,
+      uppercase,
       digits,
       symbols,
+      exclude_ambiguous,
+      safe_symbols_only,
     )
     cursor = cursor + 1
   }
@@ -45,7 +88,9 @@ pub fn generate_random_password(
     output[j] = temporary
     i = i - 1
   }
-  if !random_candidate_valid(output, digits, symbols) {
+  if !random_candidate_valid_with_policy(
+      output, lowercase, uppercase, digits, symbols, exclude_ambiguous, safe_symbols_only,
+    ) {
     return generate_invalid_config
   }
   i = 0

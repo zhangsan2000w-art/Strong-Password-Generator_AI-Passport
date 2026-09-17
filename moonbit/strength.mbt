@@ -57,7 +57,15 @@ pub fn state_configuration_valid(state : UInt64) -> Bool {
   match state_get(state, state_field_mode) {
     0 => {
       let length = state_get(state, state_field_random_length)
-      length >= random_min_length && length <= random_max_length
+      let profile = state_get(state, state_field_policy_profile)
+      length >= policy_profile_min_length(profile) &&
+      random_policy_valid(
+        length,
+        state_get(state, state_field_lowercase) == 1,
+        state_get(state, state_field_uppercase) == 1,
+        state_get(state, state_field_digits) == 1,
+        state_get(state, state_field_symbols) == 1,
+      )
     }
     1 => {
       let words = state_get(state, state_field_word_count)

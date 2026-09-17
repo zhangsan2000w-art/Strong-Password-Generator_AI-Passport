@@ -71,6 +71,15 @@ pub fn passport_moonbit_initial_state() -> UInt64 {
 }
 
 ///|
+#export_name("passport_moonbit_with_policy_profile")
+pub fn passport_moonbit_with_policy_profile(
+  state : UInt64,
+  profile : Int,
+) -> UInt64 {
+  with_policy_profile(state, profile)
+}
+
+///|
 #export_name("passport_moonbit_handle_input")
 pub fn passport_moonbit_handle_input(state : UInt64, input : Int) -> UInt64 {
   apply_input(state, input)
@@ -96,12 +105,16 @@ pub fn passport_moonbit_generate(state : UInt64) -> Int {
   let emit = fn(ch) { platform_output_push(ch) }
   match state_get(state, state_field_mode) {
     0 =>
-      generate_random_password(
+      generate_random_password_with_policy(
         next,
         emit,
         state_get(state, state_field_random_length),
+        state_get(state, state_field_lowercase) == 1,
+        state_get(state, state_field_uppercase) == 1,
         state_get(state, state_field_digits) == 1,
         state_get(state, state_field_symbols) == 1,
+        state_get(state, state_field_exclude_ambiguous) == 1,
+        state_get(state, state_field_safe_symbols_only) == 1,
       )
     1 =>
       generate_passphrase(

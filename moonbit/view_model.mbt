@@ -212,7 +212,19 @@ pub fn configuration_fingerprint(state : UInt64) -> UInt64 {
     (state_get(state, state_field_complete_word).to_uint64() << 15)
   fingerprint = fingerprint |
     (state_get(state, state_field_separator).to_uint64() << 16)
-  fingerprint | (state_get(state, state_field_pin_length).to_uint64() << 18)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_pin_length).to_uint64() << 18)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_policy_profile).to_uint64() << 22)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_lowercase).to_uint64() << 24)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_uppercase).to_uint64() << 25)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_exclude_ambiguous).to_uint64() << 26)
+  fingerprint = fingerprint |
+    (state_get(state, state_field_safe_symbols_only).to_uint64() << 27)
+  fingerprint
 }
 
 ///|

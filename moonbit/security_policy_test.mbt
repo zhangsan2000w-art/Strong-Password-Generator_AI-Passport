@@ -32,6 +32,20 @@ test "allowed symbols match the product policy" {
   @test.assert_eq(is_allowed_symbol(63), true)
   @test.assert_eq(is_allowed_symbol(34), false)
   @test.assert_eq(is_allowed_symbol(92), false)
+  @test.assert_eq(is_safe_symbol(33), true)
+  @test.assert_eq(is_safe_symbol(63), true)
+  @test.assert_eq(is_safe_symbol(94), false)
+  @test.assert_eq(is_safe_symbol(43), false)
+}
+
+///|
+test "ambiguous character policy covers visual collisions" {
+  @test.assert_eq(is_ambiguous_character(48), true) // 0
+  @test.assert_eq(is_ambiguous_character(79), true) // O
+  @test.assert_eq(is_ambiguous_character(49), true) // 1
+  @test.assert_eq(is_ambiguous_character(73), true) // I
+  @test.assert_eq(is_ambiguous_character(108), true) // l
+  @test.assert_eq(is_ambiguous_character(105), false)
 }
 
 ///|
@@ -52,6 +66,31 @@ test "random postcondition rejects disabled or unknown characters" {
   @test.assert_eq(random_candidate_valid(digit, false, false), false)
   @test.assert_eq(random_candidate_valid(symbol, true, false), false)
   @test.assert_eq(random_candidate_valid(space, true, true), false)
+}
+
+///|
+test "policy postcondition validates class and filtering constraints" {
+  let valid = fixed_candidate([97, 66, 50, 33, 99, 68, 51, 63])
+  let ambiguous = fixed_candidate([97, 66, 48, 33, 99, 68, 51, 63])
+  let unsafe_symbol = fixed_candidate([97, 66, 50, 94, 99, 68, 51, 63])
+  @test.assert_eq(
+    random_candidate_valid_with_policy(
+      valid, true, true, true, true, true, true,
+    ),
+    true,
+  )
+  @test.assert_eq(
+    random_candidate_valid_with_policy(
+      ambiguous, true, true, true, true, true, true,
+    ),
+    false,
+  )
+  @test.assert_eq(
+    random_candidate_valid_with_policy(
+      unsafe_symbol, true, true, true, true, true, true,
+    ),
+    false,
+  )
 }
 
 ///|

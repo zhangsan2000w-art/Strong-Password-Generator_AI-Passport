@@ -16,10 +16,10 @@ test "Random view exposes four product parameter slots" {
   @test.assert_eq(view_parameter_kind(0, 1), parameter_letters)
   @test.assert_eq(view_parameter_kind(0, 2), parameter_digits)
   @test.assert_eq(view_parameter_kind(0, 3), parameter_symbols)
-  @test.assert_eq(view_parameter_value(state, 0), 10)
+  @test.assert_eq(view_parameter_value(state, 0), 16)
   @test.assert_eq(view_parameter_value(state, 1), 1)
   @test.assert_eq(view_parameter_value(state, 2), 1)
-  @test.assert_eq(view_parameter_value(state, 3), 0)
+  @test.assert_eq(view_parameter_value(state, 3), 1)
 }
 
 ///|
@@ -102,7 +102,7 @@ test "strength derives from each mode entropy" {
   let random = initial_state()
   let memorable = state_for_mode(1)
   let pin = state_for_mode(2)
-  @test.assert_eq(state_strength(random), strength_strong)
+  @test.assert_eq(state_strength(random), strength_very_strong)
   @test.assert_eq(state_strength(memorable), strength_fair)
   @test.assert_eq(state_strength(pin), strength_weak)
   @test.assert_eq(state_configuration_valid(random), true)

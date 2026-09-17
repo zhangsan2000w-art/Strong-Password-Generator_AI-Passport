@@ -33,6 +33,46 @@ fn contains_digit(values : Array[Int]) -> Bool {
 }
 
 ///|
+fn contains_lowercase(values : Array[Int]) -> Bool {
+  for value in values {
+    if is_ascii_lower(value) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn contains_uppercase(values : Array[Int]) -> Bool {
+  for value in values {
+    if is_ascii_upper(value) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn contains_ambiguous(values : Array[Int]) -> Bool {
+  for value in values {
+    if is_ambiguous_character(value) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn contains_unsafe_symbol(values : Array[Int]) -> Bool {
+  for value in values {
+    if is_allowed_symbol(value) && !is_safe_symbol(value) {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn contains_symbol(values : Array[Int]) -> Bool {
   for value in values {
     if value == 33 ||
@@ -159,6 +199,74 @@ test "random password enforces enabled character classes" {
 }
 
 ///|
+test "policy generator enforces every class and filters risky characters" {
+  let source = DeterministicSource::{
+    values: [0U, 1U, 2U, 3U, 4U, 5U],
+    cursor: 0,
+  }
+  let output = Collector::{ values: [], }
+  @test.assert_eq(
+    generate_random_password_with_policy(
+      fn() { source.next() },
+      fn(ch) { output.emit(ch) },
+      16,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ),
+    generate_ok,
+  )
+  @test.assert_eq(output.values.length(), 16)
+  @test.assert_eq(contains_lowercase(output.values), true)
+  @test.assert_eq(contains_uppercase(output.values), true)
+  @test.assert_eq(contains_digit(output.values), true)
+  @test.assert_eq(contains_symbol(output.values), true)
+  @test.assert_eq(contains_ambiguous(output.values), false)
+  @test.assert_eq(contains_unsafe_symbol(output.values), false)
+}
+
+///|
+test "policy generator supports individual class selection" {
+  let source = DeterministicSource::{ values: [8U, 13U, 23U], cursor: 0, }
+  let output = Collector::{ values: [], }
+  @test.assert_eq(
+    generate_random_password_with_policy(
+      fn() { source.next() },
+      fn(ch) { output.emit(ch) },
+      8,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+    ),
+    generate_ok,
+  )
+  for value in output.values {
+    @test.assert_eq(is_ascii_upper(value), true)
+    @test.assert_eq(is_ambiguous_character(value), false)
+  }
+  @test.assert_eq(
+    generate_random_password_with_policy(
+      fn() { source.next() },
+      fn(ch) { output.emit(ch) },
+      8,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+    ),
+    generate_invalid_config,
+  )
+}
+
+///|
 test "random password omits disabled character classes" {
   let source = DeterministicSource::{ values: [53U, 61U, 74U], cursor: 0, }
   let output = Collector::{ values: [], }
@@ -278,7 +386,14 @@ test "passphrase rejects invalid configuration and dictionary indexes" {
 test "state switches modes edits toggles generates and regenerates" {
   let mut state = initial_state()
   @test.assert_eq(state_get(state, state_field_mode), 0)
-  @test.assert_eq(state_get(state, state_field_random_length), 10)
+  @test.assert_eq(state_get(state, state_field_random_length), 16)
+  @test.assert_eq(
+    state_get(state, state_field_policy_profile),
+    policy_profile_standard,
+  )
+  @test.assert_eq(state_get(state, state_field_lowercase), 1)
+  @test.assert_eq(state_get(state, state_field_uppercase), 1)
+  @test.assert_eq(state_get(state, state_field_exclude_ambiguous), 1)
   state = handle_input(state, input_down)
   @test.assert_eq(state_get(state, state_field_mode), 1)
   state = handle_input(state, input_up)
@@ -288,10 +403,10 @@ test "state switches modes edits toggles generates and regenerates" {
   state = handle_input(state, input_ok)
   @test.assert_eq(state_get(state, state_field_editing), 1)
   state = handle_input(state, input_up)
-  @test.assert_eq(state_get(state, state_field_random_length), 11)
+  @test.assert_eq(state_get(state, state_field_random_length), 17)
   state = handle_input(state, input_ok_long)
   @test.assert_eq(state_get(state, state_field_editing), 0)
-  @test.assert_eq(state_get(state, state_field_random_length), 10)
+  @test.assert_eq(state_get(state, state_field_random_length), 16)
   state = handle_input(state, input_down)
   @test.assert_eq(state_get(state, state_field_focus), 2)
   state = handle_input(state, input_ok)
@@ -321,7 +436,7 @@ test "repeated editing input clamps password length" {
   }
   @test.assert_eq(
     state_get(state, state_field_random_length),
-    random_min_length,
+    policy_profile_min_length(policy_profile_standard),
   )
   state = handle_input(state, input_ok)
   @test.assert_eq(state_get(state, state_field_editing), 0)

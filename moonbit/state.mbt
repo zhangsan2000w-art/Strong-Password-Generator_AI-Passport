@@ -47,6 +47,21 @@ let generation_count_shift : Int = 38
 let theme_shift : Int = 54
 
 ///|
+let policy_profile_shift : Int = 55
+
+///|
+let lowercase_shift : Int = 57
+
+///|
+let uppercase_shift : Int = 58
+
+///|
+let exclude_ambiguous_shift : Int = 59
+
+///|
+let safe_symbols_only_shift : Int = 60
+
+///|
 pub let state_field_mode : Int = 0
 
 ///|
@@ -87,6 +102,21 @@ pub let state_field_generation_count : Int = 12
 
 ///|
 pub let state_field_theme : Int = 13
+
+///|
+pub let state_field_policy_profile : Int = 14
+
+///|
+pub let state_field_lowercase : Int = 15
+
+///|
+pub let state_field_uppercase : Int = 16
+
+///|
+pub let state_field_exclude_ambiguous : Int = 17
+
+///|
+pub let state_field_safe_symbols_only : Int = 18
 
 ///|
 pub let input_up : Int = 0
@@ -146,12 +176,69 @@ pub fn initial_state() -> UInt64 {
   state = set_field(state, complete_word_shift, 1, 1)
   state = set_field(state, separator_shift, 3, 0)
   state = set_field(state, pin_length_shift, 15, 6)
-  state
+  with_policy_profile(state, policy_profile_standard)
 }
 
 ///|
 pub fn with_theme(state : UInt64, theme : Int) -> UInt64 {
   set_field(state, theme_shift, 1, if theme == theme_sky { 1 } else { 0 })
+}
+
+///|
+fn bool_field(value : Bool) -> Int {
+  if value {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+pub fn with_policy_profile(state : UInt64, profile : Int) -> UInt64 {
+  let normalized = normalize_policy_profile(profile)
+  let mut next = set_field(state, policy_profile_shift, 3, normalized)
+  next = set_field(
+    next,
+    random_length_shift,
+    127,
+    policy_profile_default_length(normalized),
+  )
+  next = set_field(
+    next,
+    lowercase_shift,
+    1,
+    bool_field(policy_profile_lowercase(normalized)),
+  )
+  next = set_field(
+    next,
+    uppercase_shift,
+    1,
+    bool_field(policy_profile_uppercase(normalized)),
+  )
+  next = set_field(
+    next,
+    digits_shift,
+    1,
+    bool_field(policy_profile_digits(normalized)),
+  )
+  next = set_field(
+    next,
+    symbols_shift,
+    1,
+    bool_field(policy_profile_symbols(normalized)),
+  )
+  next = set_field(
+    next,
+    exclude_ambiguous_shift,
+    1,
+    bool_field(policy_profile_exclude_ambiguous(normalized)),
+  )
+  set_field(
+    next,
+    safe_symbols_only_shift,
+    1,
+    bool_field(policy_profile_safe_symbols_only(normalized)),
+  )
 }
 
 ///|
@@ -171,6 +258,11 @@ pub fn state_get(state : UInt64, requested : Int) -> Int {
     11 => field(state, result_shift, 3)
     12 => field(state, generation_count_shift, 65535)
     13 => field(state, theme_shift, 1)
+    14 => field(state, policy_profile_shift, 3)
+    15 => field(state, lowercase_shift, 1)
+    16 => field(state, uppercase_shift, 1)
+    17 => field(state, exclude_ambiguous_shift, 1)
+    18 => field(state, safe_symbols_only_shift, 1)
     _ => -1
   }
 }
@@ -270,11 +362,15 @@ fn adjust_editing(
   match (mode, focus) {
     (0, 1) => {
       let current = state_get(state, state_field_random_length)
+      let profile = state_get(state, state_field_policy_profile)
       set_field(
         state,
         random_length_shift,
         127,
-        (current + delta).clamp(min=random_min_length, max=random_max_length),
+        (current + delta).clamp(
+          min=policy_profile_min_length(profile),
+          max=random_max_length,
+        ),
       )
     }
     (1, 1) => {

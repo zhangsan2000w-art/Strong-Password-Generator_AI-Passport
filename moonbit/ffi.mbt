@@ -17,6 +17,69 @@ extern "C" fn platform_dictionary_length(index : Int) -> Int = "passport_diction
 extern "C" fn platform_dictionary_char(index : Int, offset : Int) -> Int = "passport_dictionary_char"
 
 ///|
+#export_name("passport_moonbit_diagnostic_observation_initial")
+pub fn passport_moonbit_diagnostic_observation_initial() -> UInt64 {
+  diagnostic_observation_initial()
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_observe_character")
+pub fn passport_moonbit_diagnostic_observe_character(
+  policy_state : UInt64,
+  observation : UInt64,
+  ch : Int,
+) -> UInt64 {
+  diagnostic_observe_character(policy_state, observation, ch)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_initial")
+pub fn passport_moonbit_diagnostic_run_initial(target : Int) -> UInt64 {
+  diagnostic_run_initial(target)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_record_sample")
+pub fn passport_moonbit_diagnostic_record_sample(
+  run : UInt64,
+  policy_state : UInt64,
+  observation : UInt64,
+  generation_result : Int,
+) -> UInt64 {
+  diagnostic_record_sample(run, policy_state, observation, generation_result)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_target")
+pub fn passport_moonbit_diagnostic_run_target(run : UInt64) -> Int {
+  diagnostic_run_target(run)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_completed")
+pub fn passport_moonbit_diagnostic_run_completed(run : UInt64) -> Int {
+  diagnostic_run_completed(run)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_passed")
+pub fn passport_moonbit_diagnostic_run_passed(run : UInt64) -> Int {
+  diagnostic_run_passed(run)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_failure")
+pub fn passport_moonbit_diagnostic_run_failure(run : UInt64) -> Int {
+  diagnostic_run_failure(run)
+}
+
+///|
+#export_name("passport_moonbit_diagnostic_run_status")
+pub fn passport_moonbit_diagnostic_run_status(run : UInt64) -> Int {
+  diagnostic_run_status(run)
+}
+
+///|
 #export_name("passport_moonbit_policy_profile_normalize")
 pub fn passport_moonbit_policy_profile_normalize(profile : Int) -> Int {
   normalize_policy_profile(profile)

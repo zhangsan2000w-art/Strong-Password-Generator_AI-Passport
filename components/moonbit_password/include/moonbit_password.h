@@ -7,6 +7,15 @@ extern "C" {
 #endif
 
 void moonbit_init(void);
+uint64_t passport_moonbit_diagnostic_observation_initial(void);
+uint64_t passport_moonbit_diagnostic_observe_character(uint64_t policy_state, uint64_t observation, int32_t character);
+uint64_t passport_moonbit_diagnostic_run_initial(int32_t target);
+uint64_t passport_moonbit_diagnostic_record_sample(uint64_t run, uint64_t policy_state, uint64_t observation, int32_t generation_result);
+int32_t passport_moonbit_diagnostic_run_target(uint64_t run);
+int32_t passport_moonbit_diagnostic_run_completed(uint64_t run);
+int32_t passport_moonbit_diagnostic_run_passed(uint64_t run);
+int32_t passport_moonbit_diagnostic_run_failure(uint64_t run);
+int32_t passport_moonbit_diagnostic_run_status(uint64_t run);
 int32_t passport_moonbit_policy_profile_normalize(int32_t profile);
 int32_t passport_moonbit_policy_profile_default_length(int32_t profile);
 int32_t passport_moonbit_policy_profile_min_length(int32_t profile);

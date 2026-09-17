@@ -12,6 +12,7 @@ set(MOONBIT_SOURCES
     "${MOONBIT_SOURCE_DIR}/passphrase.mbt"
     "${MOONBIT_SOURCE_DIR}/password.mbt"
     "${MOONBIT_SOURCE_DIR}/policy.mbt"
+    "${MOONBIT_SOURCE_DIR}/policy_profile.mbt"
     "${MOONBIT_SOURCE_DIR}/random_source.mbt"
     "${MOONBIT_SOURCE_DIR}/security_policy.mbt"
     "${MOONBIT_SOURCE_DIR}/settings.mbt"

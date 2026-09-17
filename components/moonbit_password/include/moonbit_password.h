@@ -7,6 +7,12 @@ extern "C" {
 #endif
 
 void moonbit_init(void);
+int32_t passport_moonbit_policy_profile_normalize(int32_t profile);
+int32_t passport_moonbit_policy_profile_default_length(int32_t profile);
+int32_t passport_moonbit_policy_profile_min_length(int32_t profile);
+int32_t passport_moonbit_policy_profile_symbols(int32_t profile);
+int32_t passport_moonbit_policy_profile_exclude_ambiguous(int32_t profile);
+int32_t passport_moonbit_policy_profile_safe_symbols_only(int32_t profile);
 uint64_t passport_moonbit_initial_state(void);
 uint64_t passport_moonbit_handle_input(uint64_t state, int32_t input);
 int32_t passport_moonbit_state_get(uint64_t state, int32_t requested);

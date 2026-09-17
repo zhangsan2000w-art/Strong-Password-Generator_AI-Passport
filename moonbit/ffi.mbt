@@ -17,6 +17,54 @@ extern "C" fn platform_dictionary_length(index : Int) -> Int = "passport_diction
 extern "C" fn platform_dictionary_char(index : Int, offset : Int) -> Int = "passport_dictionary_char"
 
 ///|
+#export_name("passport_moonbit_policy_profile_normalize")
+pub fn passport_moonbit_policy_profile_normalize(profile : Int) -> Int {
+  normalize_policy_profile(profile)
+}
+
+///|
+#export_name("passport_moonbit_policy_profile_default_length")
+pub fn passport_moonbit_policy_profile_default_length(profile : Int) -> Int {
+  policy_profile_default_length(profile)
+}
+
+///|
+#export_name("passport_moonbit_policy_profile_min_length")
+pub fn passport_moonbit_policy_profile_min_length(profile : Int) -> Int {
+  policy_profile_min_length(profile)
+}
+
+///|
+#export_name("passport_moonbit_policy_profile_symbols")
+pub fn passport_moonbit_policy_profile_symbols(profile : Int) -> Int {
+  if policy_profile_symbols(profile) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_policy_profile_exclude_ambiguous")
+pub fn passport_moonbit_policy_profile_exclude_ambiguous(profile : Int) -> Int {
+  if policy_profile_exclude_ambiguous(profile) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_policy_profile_safe_symbols_only")
+pub fn passport_moonbit_policy_profile_safe_symbols_only(profile : Int) -> Int {
+  if policy_profile_safe_symbols_only(profile) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
 #export_name("passport_moonbit_initial_state")
 pub fn passport_moonbit_initial_state() -> UInt64 {
   initial_state()

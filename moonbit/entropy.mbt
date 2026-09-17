@@ -4,18 +4,55 @@ pub fn random_entropy_bits_x10(
   digits : Bool,
   symbols : Bool,
 ) -> Int {
-  if length < random_min_length || length > random_max_length {
+  random_entropy_bits_x10_with_policy(
+    length, true, true, digits, symbols, false, false,
+  )
+}
+
+///|
+/// Integer binary logarithm in thousandths. Ten squaring steps retain enough
+/// precision for the one-decimal-bit product display without floating point.
+pub fn log2_milli(value : Int) -> Int {
+  if value <= 1 {
     return 0
   }
-  let milli_bits_per_character = if digits && symbols {
-    6229 // log2(75)
-  } else if digits {
-    5954 // log2(62)
-  } else if symbols {
-    6022 // log2(65)
-  } else {
-    5700 // log2(52)
+  let mut integer = 0
+  let mut base = 1
+  while base * 2 <= value {
+    base = base * 2
+    integer = integer + 1
   }
+  let mut normalized = value.to_uint64() * 65536UL / base.to_uint64()
+  let mut fraction_1024 = 0
+  let mut step = 0
+  while step < 10 {
+    normalized = normalized * normalized / 65536UL
+    if normalized >= 131072UL {
+      normalized = normalized / 2UL
+      fraction_1024 = fraction_1024 + (1 << (9 - step))
+    }
+    step = step + 1
+  }
+  integer * 1000 + fraction_1024 * 1000 / 1024
+}
+
+///|
+pub fn random_entropy_bits_x10_with_policy(
+  length : Int,
+  lowercase : Bool,
+  uppercase : Bool,
+  digits : Bool,
+  symbols : Bool,
+  exclude_ambiguous : Bool,
+  safe_symbols_only : Bool,
+) -> Int {
+  if !random_policy_valid(length, lowercase, uppercase, digits, symbols) {
+    return 0
+  }
+  let pool_size = random_pool_size(
+    lowercase, uppercase, digits, symbols, exclude_ambiguous, safe_symbols_only,
+  )
+  let milli_bits_per_character = log2_milli(pool_size)
   length * milli_bits_per_character / 100
 }
 

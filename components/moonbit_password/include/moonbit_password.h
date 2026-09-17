@@ -21,6 +21,7 @@ int32_t passport_moonbit_state_action(uint64_t state);
 int32_t passport_moonbit_generate(uint64_t state);
 int32_t passport_moonbit_entropy_x10(uint64_t state);
 int32_t passport_moonbit_strength(uint64_t state);
+int32_t passport_moonbit_security_warning(uint64_t state);
 int32_t passport_moonbit_configuration_valid(uint64_t state);
 int32_t passport_moonbit_configuration_changed(uint64_t before, uint64_t after);
 uint64_t passport_moonbit_record_generation(uint64_t state, int32_t result);

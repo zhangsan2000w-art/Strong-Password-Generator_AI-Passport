@@ -242,6 +242,29 @@ pub fn with_policy_profile(state : UInt64, profile : Int) -> UInt64 {
 }
 
 ///|
+pub fn with_random_policy_options(
+  state : UInt64,
+  lowercase : Bool,
+  uppercase : Bool,
+  digits : Bool,
+  symbols : Bool,
+  exclude_ambiguous : Bool,
+  safe_symbols_only : Bool,
+) -> UInt64 {
+  let mut next = set_field(state, lowercase_shift, 1, bool_field(lowercase))
+  next = set_field(next, uppercase_shift, 1, bool_field(uppercase))
+  next = set_field(next, digits_shift, 1, bool_field(digits))
+  next = set_field(next, symbols_shift, 1, bool_field(symbols))
+  next = set_field(
+    next,
+    exclude_ambiguous_shift,
+    1,
+    bool_field(exclude_ambiguous),
+  )
+  set_field(next, safe_symbols_only_shift, 1, bool_field(safe_symbols_only))
+}
+
+///|
 pub fn state_get(state : UInt64, requested : Int) -> Int {
   match requested {
     0 => field(state, mode_shift, 3)

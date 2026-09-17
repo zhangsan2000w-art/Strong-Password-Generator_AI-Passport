@@ -32,10 +32,14 @@ pub fn strength_from_entropy_x10(entropy_x10 : Int) -> Int {
 pub fn state_entropy_x10(state : UInt64) -> Int {
   match state_get(state, state_field_mode) {
     0 =>
-      random_entropy_bits_x10(
+      random_entropy_bits_x10_with_policy(
         state_get(state, state_field_random_length),
+        state_get(state, state_field_lowercase) == 1,
+        state_get(state, state_field_uppercase) == 1,
         state_get(state, state_field_digits) == 1,
         state_get(state, state_field_symbols) == 1,
+        state_get(state, state_field_exclude_ambiguous) == 1,
+        state_get(state, state_field_safe_symbols_only) == 1,
       )
     1 =>
       passphrase_entropy_bits_x10(

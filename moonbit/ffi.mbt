@@ -145,6 +145,12 @@ pub fn passport_moonbit_strength(state : UInt64) -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_security_warning")
+pub fn passport_moonbit_security_warning(state : UInt64) -> Int {
+  state_security_warning(state)
+}
+
+///|
 #export_name("passport_moonbit_configuration_valid")
 pub fn passport_moonbit_configuration_valid(state : UInt64) -> Int {
   if state_configuration_valid(state) {

@@ -67,8 +67,8 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
         MOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_SYSTEM
     )
-    # MoonBit 0.1.20260904 emits valid C that trips two ESP-IDF style
-    # diagnostics promoted by -Werror. Keep every other warning fatal.
+    # MoonBit's generated C trips two ESP-IDF style diagnostics promoted by
+    # -Werror. Keep every other warning fatal.
     target_compile_options(${COMPONENT_LIB} PRIVATE
         -Wno-error=missing-braces
         -Wno-error=parentheses

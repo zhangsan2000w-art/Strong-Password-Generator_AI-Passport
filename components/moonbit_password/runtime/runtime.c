@@ -34,6 +34,7 @@ void *malloc(size_t size);
 void free(void *ptr);
 void *memset(void *dst, int c, size_t n);
 void *memcpy(void *dst, const void *src, size_t n);
+int printf(const char *format, ...);
 void *memmove(void *dst, const void *src, size_t n);
 int memcmp(const void *s1, const void *s2, size_t n);
 
@@ -43,6 +44,7 @@ int memcmp(const void *s1, const void *s2, size_t n);
 
 #else
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -62,8 +64,95 @@ void moonbit_free_raw(void *obj) {
 //   word 1: number of following reference offsets
 //   word 2+: reference-start offsets in 4-byte payload words
 MOONBIT_EXPORT const uint32_t *moonbit_layout_table = 0;
+// The possible-root buffer is private to this file. System-allocator allocation
+// code queries it through [moonbit_cycle_collection_threshold], while the
+// mimalloc deferred-free callback consumes it directly.
+#define ROOT_CHUNK_SIZE 256
+typedef struct root_list {
+  void* elems[ROOT_CHUNK_SIZE];
+  uint32_t len;
+  struct root_list *next;
+} root_list;
+
+static struct {
+  root_list *root;
+  uint32_t chunks;
+} moonbit_cycle = { NULL, 0 };
+
+// Use a high fixed trigger so roots that survive a collection do not normally
+// retrigger trial deletion at the next system allocation. Only regular-object
+// allocations poll the trigger, so the buffer can transiently grow beyond this
+// many chunks.
+#ifndef MOONBIT_CYCLE_COLLECT_AT
+#define MOONBIT_CYCLE_COLLECT_AT 64
+#endif
+
+MOONBIT_EXPORT int32_t moonbit_cycle_collection_threshold(void) {
+  return moonbit_cycle.chunks > MOONBIT_CYCLE_COLLECT_AT;
+}
+
+static void scan_dead(void *ptr);
+static void mark_pending(void *ptr);
+static void scan_pending(void *ptr);
+static void collect_dead(void *ptr);
+
+#if MOONBIT_TRIAL_DELETION &&                                      \
+    MOONBIT_ALLOCATOR == MOONBIT_ALLOCATOR_MIMALLOC
+#include <stdbool.h>
+
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#define MOONBIT_MIMALLOC_CDECL __cdecl
+#else
+#define MOONBIT_MIMALLOC_CDECL
+#endif
+
+// Keep these declarations ABI-compatible with mimalloc.h without requiring
+// consumers of the runtime archive to have the mimalloc headers installed.
+typedef void (MOONBIT_MIMALLOC_CDECL moonbit_mimalloc_deferred_free_fun)(
+    bool force, unsigned long long heartbeat, void *arg);
+void mi_register_deferred_free(
+    moonbit_mimalloc_deferred_free_fun *deferred_free, void *arg);
+
+// Mimalloc runs this from its allocation slow path, so it recurs every few
+// allocations. Collecting on any non-empty buffer therefore collapses into
+// collecting continuously: a program that decrefs shared cycle-capable objects
+// refills the buffer within a handful of allocations, and each call rewalks the
+// whole live subgraph reachable from the buffered roots. Gate on the same
+// threshold the system-allocator poll uses so that walk is amortized.
+// [force] is only set when mimalloc is already collecting the heap: the
+// out-of-memory retry in [_mi_malloc_generic], heap abandon, and process
+// teardown. Those are rare, and reclaiming cycles there is exactly what the
+// caller wants, so honour them regardless of the buffer size.
+static void MOONBIT_MIMALLOC_CDECL moonbit_mimalloc_deferred_free(
+    bool force, unsigned long long heartbeat, void *arg) {
+  (void)heartbeat;
+  (void)arg;
+  if (force || moonbit_cycle_collection_threshold()) {
+    moonbit_collect_cycles();
+  }
+}
+
+#undef MOONBIT_MIMALLOC_CDECL
+#endif
+
+MOONBIT_EXPORT void moonbit_allocator_init(void) {
+#if MOONBIT_TRIAL_DELETION &&                                      \
+    MOONBIT_ALLOCATOR == MOONBIT_ALLOCATOR_MIMALLOC
+  mi_register_deferred_free(moonbit_mimalloc_deferred_free, NULL);
+#endif
+}
 
 MOONBIT_EXPORT void *moonbit_malloc(size_t size) {
+#if MOONBIT_TRIAL_DELETION &&                                      \
+    MOONBIT_ALLOCATOR == MOONBIT_ALLOCATOR_SYSTEM
+  // With the system allocator, regular-object allocation is the collection
+  // safe point. A decref may sit inside a partially completed drop, so
+  // [moonbit_possible_root] only buffers. Mimalloc builds use its registered
+  // deferred-free callback instead of polling every allocation.
+  if (moonbit_cycle_collection_threshold()) {
+    moonbit_collect_cycles();
+  }
+#endif
   struct moonbit_object *ptr =
       (struct moonbit_object *)MOONBIT_MALLOC_RAW(sizeof(struct moonbit_object) + size);
   Moonbit_init_dynamic_rc(ptr, moonbit_BLOCK_KIND_REGULAR);
@@ -113,6 +202,66 @@ MOONBIT_EXPORT void *moonbit_malloc(size_t size) {
     << MOONBIT_REGULAR_LAYOUT_CLASS_SHIFT) |                                  \
    ((uint32_t)(payload_size) & MOONBIT_EXTERNAL_PAYLOAD_SIZE_MASK))
 
+#define MOONBIT_DEC_RC_CNT(ptr) (Moonbit_object_header(ptr)->rc -= MOONBIT_RC_COUNT_UNIT)
+#define MOONBIT_INC_RC_CNT(ptr) (Moonbit_object_header(ptr)->rc += MOONBIT_RC_COUNT_UNIT)
+
+MOONBIT_EXPORT void moonbit_push_root(void *ptr) {
+  if (moonbit_cycle.root == NULL || moonbit_cycle.root->len == ROOT_CHUNK_SIZE) {
+    root_list *new_root = (root_list *)malloc(sizeof(root_list));
+    new_root->len = 0;
+    new_root->next = moonbit_cycle.root;
+    moonbit_cycle.root = new_root;
+    ++moonbit_cycle.chunks;
+  }
+  moonbit_cycle.root->elems[moonbit_cycle.root->len++] = ptr;
+  // Publish the entry before any collection can observe it.
+  set_in_root(ptr);
+}
+
+static void destroy_root_list(root_list *list) {
+  while (list != NULL) {
+    root_list *next = list->next;
+    free(list);
+    list = next;
+  }
+}
+
+static void free_object(void *obj) {
+  if (Moonbit_object_kind(obj) == moonbit_BLOCK_KIND_REF_VALTYPE_ARRAY) {
+    // Reference-containing value-type arrays carry an extra word-sized header
+    // before the normal object header. Move the payload pointer back so
+    // moonbit_free sees the original allocation base.
+    obj = (uint64_t *)obj - 1;
+  }
+  moonbit_free(obj);
+}
+
+#if MOONBIT_TRIAL_DELETION
+static void deferred_free_object(void *obj) {
+  if (!MOONBIT_IN_ROOT(obj)) {
+    free_object(obj);
+  } else {
+    // set RC to 0 so that it can be dropped during [moonbit_collect_cycles]
+    set_cycle_status(obj, moonbit_CYCLE_STATUS_LIVE);
+    struct moonbit_object *header = Moonbit_object_header(obj);
+    header->rc &= MOONBIT_RC_STOLEN_BITS_MASK;
+  }
+}
+#define MOONBIT_DEFERRED_FREE_OBJECT(obj) deferred_free_object(obj)
+#else
+#define MOONBIT_DEFERRED_FREE_OBJECT(obj) free_object(obj)
+#endif
+
+// Entry point for compiler-specialized drops of cycle-capable objects. The
+// caller has already released every outgoing reference.
+MOONBIT_EXPORT void moonbit_deferred_free(void *obj) {
+#if MOONBIT_TRIAL_DELETION
+  deferred_free_object(obj);
+#else
+  free_object(obj);
+#endif
+}
+
 static void **ref_slot_at(uint32_t layout_meta, void *value, int32_t ref_index) {
   int32_t offset_in_word =
       (int32_t)(Moonbit_header_child_tagged(layout_meta, ref_index) >> 1);
@@ -160,6 +309,49 @@ struct drop_object_worklist {
     void *data[1]; // Children to process in the worklist
   };
 };
+
+#if MOONBIT_TRIAL_DELETION
+// the highest bit of [index] is used to restore in_root
+// the highest bit is used to indicate whether it has extended header
+#define MOONBIT_WL_IN_ROOT(wl) ((wl)->index & 0x80000000)
+#define MOONBIT_WL_EXTENDED_HEADER(wl) ((wl)->count & 0x80000000)
+#define MOONBIT_WL_INDEX(wl) ((wl)->index & 0x7fffffff)
+#define MOONBIT_WL_COUNT(wl) ((wl)->count & 0x7fffffff)
+#define MOONBIT_SET_WL_INDEX(wl, i) ((wl)->index = i | ((wl)->index & 0x80000000))
+
+static void free_wl_node(struct drop_object_worklist *wl_node) {
+  if (!MOONBIT_WL_IN_ROOT(wl_node)) {
+    MOONBIT_FREE_RAW(wl_node);
+  } else {
+    // the object is in root so the free is deferred until next round
+    // of trial deletion
+    void* obj =
+      MOONBIT_WL_EXTENDED_HEADER(wl_node) ?
+      (void*)((struct moonbit_valtype_array_header *)(wl_node) + 1) :
+      (void*)((struct moonbit_object *)(wl_node) + 1);
+
+    struct moonbit_object *header = Moonbit_object_header(obj);
+    // set RC to 0 so that it can be dropped during [moonbit_collect_cycles]
+    header->rc = 0;
+    // restore the in_root bit
+    set_in_root(obj);
+    // restore the kind
+    header->rc |= MOONBIT_WL_EXTENDED_HEADER(wl_node) ? moonbit_BLOCK_KIND_REF_VALTYPE_ARRAY : moonbit_BLOCK_KIND_REGULAR;
+    // restore the cycle status
+    set_cycle_status(obj, moonbit_CYCLE_STATUS_LIVE);
+  }
+}
+#define MOONBIT_FREE_WL_NODE(wl_node) free_wl_node(wl_node)
+#define MOONBIT_INIT_WL_INDEX(wl, obj) ((wl)->index = 0 | ((uint32_t)MOONBIT_IN_ROOT(obj) << 31))
+#define MOONBIT_INIT_WL_COUNT_SET_EXT_HEADER(wl, i) ((wl)->count = i | (1u << 31))
+#else
+#define MOONBIT_WL_INDEX(wl) ((wl)->index)
+#define MOONBIT_WL_COUNT(wl) ((wl)->count)
+#define MOONBIT_SET_WL_INDEX(wl, i) ((wl)->index = i)
+#define MOONBIT_FREE_WL_NODE(wl_node) MOONBIT_FREE_RAW(wl_node)
+#define MOONBIT_INIT_WL_INDEX(wl, obj) ((wl)->index = 0)
+#define MOONBIT_INIT_WL_COUNT_SET_EXT_HEADER(wl, i) ((wl)->count = i)
+#endif
 
 static inline
 uint32_t scan_regular_object(
@@ -210,6 +402,10 @@ uint32_t scan_regular_object(
 }
 
 MOONBIT_EXPORT void moonbit_drop_object(void *obj) {
+  // Headers of the objects walked below are repurposed as worklist storage.
+  // No collection can observe them mid-walk: allocator callbacks and explicit
+  // allocation polls only run at allocation safe points, and dropping never
+  // allocates.
   // The root of worklist, holding remaining objects to drop.
   struct drop_object_worklist *wl_root = 0;
   // The current worklist node being processed.
@@ -254,10 +450,10 @@ process_new_object:
               // fast path: all children are simple reference,
               // the layout is already compatible with `wl_node`,
               // no need to compact the layout
-              wl_node->index = 0;
+              MOONBIT_INIT_WL_INDEX(wl_node, obj);
               wl_node->count = layout[1];
             } else {
-              wl_node->index = 0;
+              MOONBIT_INIT_WL_INDEX(wl_node, obj);
               wl_node->count = scan_regular_object(obj, layout, wl_node, 0);
             }
             goto find_next_object;
@@ -270,7 +466,7 @@ process_new_object:
       case moonbit_BLOCK_KIND_REF_ARRAY: {
         // The layout of reference array is compatible with `wl_node`,
         // so no need to do any compaction here.
-        wl_node->index = 0;
+        MOONBIT_INIT_WL_INDEX(wl_node, obj);
         wl_node->count = meta;
         goto find_next_object;
       }
@@ -281,14 +477,14 @@ process_new_object:
         // so we need to adjust the worklist node accordingly
         wl_node = (struct drop_object_worklist*)varray_header;
         uint32_t const *elem_layout = Moonbit_header_layout(varray_header->elem_header);
-        wl_node->index = 0;
+        MOONBIT_INIT_WL_INDEX(wl_node, obj);
         uint32_t const elem_size = elem_layout[0];
         uint32_t count = 0;
         for (uint32_t i = 0; i < meta; ++i) {
           uint32_t *elem_start = (uint32_t*)obj + i * elem_size;
           count = scan_regular_object(elem_start, elem_layout, wl_node, count);
         }
-        wl_node->count = count;
+        MOONBIT_INIT_WL_COUNT_SET_EXT_HEADER(wl_node, count);
         goto find_next_object;
       }
     }
@@ -297,10 +493,11 @@ back_to_parent:
   /* The `back_to_parent` block should be executed when current `wl_node` is completely processed.
      `back_to_parent` free this node and fetch a new node from the global `wl_root` list.
    */
-  MOONBIT_FREE_RAW(wl_node);
-  if (!wl_root)
+  MOONBIT_FREE_WL_NODE(wl_node);
+  if (!wl_root) {
     // Everything dropped, no more work to do
     return;
+  }
 
   /* Note that we does not remove the new node from `wl_root` here,
      because in case we find a new child to drop below in `find_next_object`,
@@ -319,7 +516,7 @@ find_next_object:
      If the control flow come from `process_new_object`,
      `wl_node` will be a fresh node not yet linked to `wl_root`.
    */
-  for (uint32_t i = wl_node->index, count = wl_node->count; i < count; ++i) {
+  for (uint32_t i = MOONBIT_WL_INDEX(wl_node), count = MOONBIT_WL_COUNT(wl_node); i < count; ++i) {
     obj = wl_node->data[i];
     if (!obj)
       continue;
@@ -330,6 +527,7 @@ find_next_object:
       // This child is still alive, decrease the count and
       // continue with remaining reference children
       header->rc = rc - MOONBIT_RC_COUNT_UNIT;
+      MOONBIT_ADD_POSSIBLE_ROOT(obj);
       continue;
     }
 
@@ -343,9 +541,9 @@ find_next_object:
       // last child in parent, no longer need to keep parent in the worklist
       if (wl_node == wl_root)
         wl_root = wl_node->next;
-      MOONBIT_FREE_RAW(wl_node);
+      MOONBIT_FREE_WL_NODE(wl_node);
     } else {
-      wl_node->index = i;
+      MOONBIT_SET_WL_INDEX(wl_node, i);
       if (wl_node != wl_root) {
         // `wl_node` come from a new object, link it to the worklist.
         // Note that the first object in `wl_node->data` must have been traversed now,
@@ -370,6 +568,7 @@ MOONBIT_EXPORT void moonbit_incref(void *ptr) {
   int32_t const rc = header->rc;
   if (raw_rc_is_dynamic(rc)) {
     Moonbit_increase_rc_count(header);
+    MOONBIT_MARK_LIVE(ptr);
   }
 }
 
@@ -378,8 +577,287 @@ MOONBIT_EXPORT void moonbit_decref(void *ptr) {
   int32_t const rc = header->rc;
   if (raw_rc_is_shared(rc)) {
     header->rc = rc - MOONBIT_RC_COUNT_UNIT;
+    MOONBIT_ADD_POSSIBLE_ROOT(ptr);
   } else if (raw_rc_is_dynamic(rc)) {
     moonbit_drop_object(ptr);
+  }
+}
+
+/* ===================
+  Trial Deletion
+ ====================*/
+
+static void visit_children_layout(
+  void *ptr,
+  uint32_t const *layout,
+  void (*visitor)(void *)) {
+  uint32_t const count = layout[1];
+  for (uint32_t i = 0; i < count; ++i) {
+    uint32_t const ref_field_desc = layout[i + 2];
+    uint32_t *obj_start = (uint32_t*)ptr + (ref_field_desc >> 1);
+    if (ref_field_desc & 1u) {
+      // venum case
+      uint32_t const venum_meta = *obj_start;
+      if (Moonbit_header_layout_class(venum_meta)
+          == MOONBIT_REGULAR_LAYOUT_CLASS_INDEXED) {
+        uint32_t const *layout = Moonbit_header_layout(venum_meta);
+        visit_children_layout(obj_start, layout, visitor);
+      }
+    } else {
+      void *child = *(void**)obj_start;
+      if (child) {
+        visitor(child);
+      }
+    }
+  }
+}
+
+static void visit_children(void* ptr, void (*visitor)(void*)) {
+  struct moonbit_object *header = Moonbit_object_header(ptr);
+  switch (Moonbit_object_kind(ptr)) {
+    case moonbit_BLOCK_KIND_REGULAR: {
+      if (Moonbit_header_layout_class(header->meta) == MOONBIT_REGULAR_LAYOUT_CLASS_INDEXED) {
+        uint32_t const *layout = Moonbit_header_layout(header->meta);
+        visit_children_layout(ptr, layout, visitor);
+      }
+      break;
+    }
+    case moonbit_BLOCK_KIND_REF_ARRAY: {
+      uint32_t const len = Moonbit_array_length(ptr);
+      for (uint32_t i = 0; i < len; ++i) {
+        void* child = ((void**)ptr)[i];
+        if (child)
+        visitor(child);
+      }
+      break;
+    }
+    case moonbit_BLOCK_KIND_REF_VALTYPE_ARRAY: {
+      uint32_t const len = Moonbit_array_length(ptr);
+      if (len == 0) {
+        break;
+      }
+      uint32_t const elem_header = Moonbit_valtype_header(ptr)->elem_header;
+      uint32_t const *venum_layout = Moonbit_header_layout(elem_header);
+      uint32_t const elem_size_in_word = venum_layout[0];
+      for (uint32_t i = 0; i < len; ++i) {
+        void* elem = ((uint32_t *)ptr + (int32_t)i * elem_size_in_word);
+        visit_children_layout(elem, venum_layout, visitor);
+      }
+      break;
+    }
+    default:
+      return;
+  }
+}
+
+static void mark_pending_visitor(void *ptr) {
+  if (!moonbit_cycle_capable(ptr)) {
+    return;
+  }
+  MOONBIT_DEC_RC_CNT(ptr);
+  mark_pending(ptr);
+}
+
+static void mark_pending(void *ptr) {
+  if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_PENDING)) {
+    return;
+  }
+  set_cycle_status(ptr, moonbit_CYCLE_STATUS_PENDING);
+  visit_children(ptr, mark_pending_visitor);
+}
+
+static void mark_roots(root_list* r) {
+  while (r) {
+    for (uint32_t i = 0; i < r->len; ++i) {
+      void *ptr = r->elems[i];
+      if (!ptr) {
+        continue;
+      }
+      if (MOONBIT_CHECK_CYCLE_STATUS(
+          ptr, moonbit_CYCLE_STATUS_ACYCLIC_OR_CANDIDATE)) {
+        mark_pending(ptr);
+      } else {
+        // 1. there are nodes in [root] that have been visited so they might be
+        // PENDING and for this case we no longer consider them in root so that
+        // in later stages they are not considered as roots
+        //
+        // 2. there are also LIVE nodes -- which we just drop if rc = 0
+        clear_in_root(ptr);
+        r->elems[i] = NULL;
+        if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_LIVE)
+            && Moonbit_rc_count(Moonbit_object_header(ptr)) == 0) {
+            free_object(ptr);
+        }
+      }
+    }
+    r = r->next;
+  }
+}
+
+static void scan_dead_first_time_visitor(void *ptr) {
+  if (!moonbit_cycle_capable(ptr)) {
+    return;
+  }
+  MOONBIT_INC_RC_CNT(ptr);
+  if (!MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_LIVE)) {
+    scan_dead(ptr);
+  }
+}
+
+static void scan_dead_second_time_visitor(void *ptr) {
+  if (!moonbit_cycle_capable(ptr)) {
+    return;
+  }
+  if (!MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_LIVE)) {
+    scan_dead(ptr);
+  }
+}
+
+static void scan_dead(void *ptr) {
+  if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_PENDING)) {
+    set_cycle_status(ptr, moonbit_CYCLE_STATUS_LIVE);
+    visit_children(ptr, scan_dead_first_time_visitor);
+  } else if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_DEAD)) {
+    set_cycle_status(ptr, moonbit_CYCLE_STATUS_LIVE);
+    visit_children(ptr, scan_dead_second_time_visitor);
+  }
+}
+
+static void scan_pending_visitor(void *ptr) {
+  if (!moonbit_cycle_capable(ptr)) {
+    return;
+  }
+  scan_pending(ptr);
+  MOONBIT_INC_RC_CNT(ptr);
+}
+
+static void scan_pending(void *ptr) {
+  if (!MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_PENDING)) {
+    return;
+  }
+  if (Moonbit_rc_count(Moonbit_object_header(ptr)) == 0) {
+    set_cycle_status(ptr, moonbit_CYCLE_STATUS_DEAD);
+    visit_children(ptr, scan_pending_visitor);
+  } else {
+    scan_dead(ptr);
+  }
+}
+
+static void scan_roots(root_list* r) {
+  while (r) {
+    for (uint32_t i = 0; i < r->len; ++i) {
+      if (r->elems[i]) {
+        scan_pending(r->elems[i]);
+      }
+    }
+    r = r->next;
+  }
+}
+
+static void collect_dead_visitor(void *ptr) {
+  if (moonbit_cycle_capable(ptr)) {
+    if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_DEAD)) {
+      MOONBIT_DEC_RC_CNT(ptr);
+      collect_dead(ptr);
+    } else if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_PENDING)) {
+      MOONBIT_DEC_RC_CNT(ptr);
+      if (Moonbit_rc_count(Moonbit_object_header(ptr)) == 0) {
+        free_object(ptr);
+      }
+    } else {
+      moonbit_decref(ptr);
+    }
+  } else {
+    moonbit_decref(ptr);
+  }
+}
+
+static void collect_dead(void *ptr) {
+  MOONBIT_INC_RC_CNT(ptr);
+
+  set_cycle_status(ptr, moonbit_CYCLE_STATUS_PENDING);
+  visit_children(ptr, collect_dead_visitor);
+
+  MOONBIT_DEC_RC_CNT(ptr);
+  if (Moonbit_rc_count(Moonbit_object_header(ptr)) == 0) {
+    free_object(ptr);
+  }
+}
+
+static void collect_roots(root_list *r) {
+  while (r) {
+    for (uint32_t i = 0; i < r->len; ++i) {
+      void* ptr = r->elems[i];
+      if (ptr) {
+        r->elems[i] = NULL;
+        if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_DEAD)) {
+          clear_in_root(ptr);
+          collect_dead(ptr);
+        } else if (MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_ACYCLIC_OR_CANDIDATE)) {
+          // the object is decref-ed by not freed and because its in_root bit is
+          // set, it's not added to the new so here move the object to the new root
+          moonbit_push_root(ptr);
+        } else {
+          if (!MOONBIT_CHECK_CYCLE_STATUS(ptr, moonbit_CYCLE_STATUS_LIVE)) {
+            moonbit_panic();
+          }
+          clear_in_root(ptr);
+          if (Moonbit_rc_count(Moonbit_object_header(ptr)) == 0) {
+            free_object(ptr);
+          }
+        }
+      }
+    }
+    r = r->next;
+  }
+}
+
+MOONBIT_EXPORT void moonbit_collect_cycles(void) {
+  root_list *processing = moonbit_cycle.root;
+  moonbit_cycle.root = NULL;
+  // [collect_roots] re-pushes survivors into the fresh buffer, so the count
+  // has to be zeroed here rather than afterwards.
+  moonbit_cycle.chunks = 0;
+  mark_roots(processing);
+  scan_roots(processing);
+  collect_roots(processing);
+  destroy_root_list(processing);
+}
+
+MOONBIT_EXPORT void moonbit_flush_cycles(void) {
+#if MOONBIT_TRIAL_DELETION
+  while (moonbit_cycle.root) {
+    moonbit_collect_cycles();
+  }
+#endif
+}
+
+MOONBIT_EXPORT void moonbit_collect_cycles_for_testing(void) {
+  moonbit_collect_cycles();
+}
+
+MOONBIT_EXPORT void moonbit_dump_root_for_testing(void) {
+  // Indexed by the 2-bit enum moonbit_cycle_status.
+  static const char *const cycle_status_names[4] = {
+    "CANDIDATE", "PENDING", "LIVE", "DEAD"
+  };
+  root_list *r = moonbit_cycle.root;
+  uint32_t root_index = 0;
+  while (r) {
+    for (uint32_t i = 0; i < r->len; ++i) {
+      void *ptr = r->elems[i];
+      if (ptr) {
+        struct moonbit_object *header = Moonbit_object_header(ptr);
+        printf("root[%u]: rc=%d kind=%u status=%s in_root=%u\n",
+               (unsigned int)root_index,
+               (int)Moonbit_rc_count(header),
+               (unsigned int)Moonbit_object_kind(ptr),
+               cycle_status_names[MOONBIT_CYCLE_STATUS(ptr) & 3u],
+               MOONBIT_IN_ROOT(ptr) ? 1u : 0u);
+        root_index += 1;
+      }
+    }
+    r = r->next;
   }
 }
 
@@ -619,6 +1097,7 @@ MOONBIT_EXPORT int32_t moonbit_unsafe_ref_array_blit(void *dst,
   int32_t const src_rc = src_header->rc;
   if (raw_rc_is_shared(src_rc)) {
     src_header->rc = src_rc - MOONBIT_RC_COUNT_UNIT;
+    MOONBIT_ADD_POSSIBLE_ROOT(src_ptrs);
   } else if (raw_rc_is_dynamic(src_rc)) {
     for (int32_t i = 0; i < src_offset; ++i) {
       if (src_ptrs[i])
@@ -634,7 +1113,7 @@ MOONBIT_EXPORT int32_t moonbit_unsafe_ref_array_blit(void *dst,
     }
     // since `src` is unique, it must not overlap with `dst`
     memcpy(dst_ptrs + dst_offset, src_ptrs + src_offset, len * sizeof(void *));
-    moonbit_free(src_ptrs);
+    MOONBIT_DEFERRED_FREE_OBJECT(src_ptrs);
     moonbit_decref(dst_ptrs);
     return 0;
   }
@@ -703,6 +1182,7 @@ MOONBIT_EXPORT void **moonbit_make_ref_array_with_blit(
   int32_t const src_rc = src_header->rc;
   if (raw_rc_is_shared(src_rc)) {
     src_header->rc = src_rc - MOONBIT_RC_COUNT_UNIT;
+    MOONBIT_ADD_POSSIBLE_ROOT(src_ptrs);
   } else if (raw_rc_is_dynamic(src_rc)) {
     for (int32_t i = 0; i < src_offset; ++i) {
       if (src_ptrs[i])
@@ -713,7 +1193,7 @@ MOONBIT_EXPORT void **moonbit_make_ref_array_with_blit(
         moonbit_decref(src_ptrs[i]);
     }
     memcpy(dst_ptrs + dst_offset, src_ptrs + src_offset, len * sizeof(void *));
-    moonbit_free(src_ptrs);
+    MOONBIT_DEFERRED_FREE_OBJECT(src_ptrs);
     return dst_ptrs;
   }
   for (int32_t i = src_offset; i < src_end; ++i) {

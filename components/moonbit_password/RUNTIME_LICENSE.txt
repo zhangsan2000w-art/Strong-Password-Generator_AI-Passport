@@ -1,5 +1,5 @@
 The files under runtime/ are copied from the MoonBit native runtime distributed
-with MoonBit 0.1.20260904 (moonc v0.10.12+1634b282e). They are licensed under
+with MoonBit 0.1.20260915 (moonc v0.10.13+cbb11c36f). They are licensed under
 the Apache License, Version 2.0. Each copied file retains its upstream header.
 
-https://github.com/moonbitlang/moonbit-runtime
+https://github.com/moonbitlang/moonbit-native-runtime

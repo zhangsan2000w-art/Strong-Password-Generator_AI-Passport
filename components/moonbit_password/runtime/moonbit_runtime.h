@@ -24,6 +24,10 @@
 
 #include "moonbit.h"
 
+#ifndef MOONBIT_TRIAL_DELETION
+#define MOONBIT_TRIAL_DELETION 0
+#endif
+
 // Extract the 2-bit layout class from an object's header word. Shared so the
 // value-enum retain/release fast path (is-this-variant-INDEXED?) can be inlined
 // at call sites (runtime_core.c) while the reference-walking loop stays out of
@@ -167,6 +171,73 @@ static inline void clear_in_root(void *ptr) {
    MOONBIT_CYCLE_STATUS_SHIFT)
 #define MOONBIT_CHECK_CYCLE_STATUS(obj, status)                               \
   (MOONBIT_CYCLE_STATUS(obj) == (status))
+
+// [possible_root] and [deferred_free] are used in drop specialization.
+// [possible_root] is defined inline below; only [push_root], its buffer-append
+// slow path, stays out of line since that is the branch which may allocate.
+MOONBIT_EXPORT void moonbit_push_root(void *ptr);
+MOONBIT_EXPORT void moonbit_deferred_free(void *ptr);
+// Called by [moonbit_runtime_init] to install allocator-specific hooks.
+MOONBIT_EXPORT void moonbit_allocator_init(void);
+// [flush_cycles] is called at the end of the main function.
+MOONBIT_EXPORT void moonbit_flush_cycles(void);
+// Testing utilities.
+MOONBIT_EXPORT void moonbit_collect_cycles_for_testing(void);
+MOONBIT_EXPORT void moonbit_dump_root_for_testing(void);
+
+// Nonzero once the possible-root buffer has outgrown its fixed trigger.
+// System-allocator builds poll this at regular-object allocation safe points;
+// mimalloc builds check it from their deferred-free callback instead, and also
+// collect when mimalloc asks for a forced heap collection.
+// Collection never starts from inside a drop.
+MOONBIT_EXPORT int32_t moonbit_cycle_collection_threshold(void);
+MOONBIT_EXPORT void moonbit_collect_cycles(void);
+
+static inline int32_t moonbit_cycle_capable(void *ptr) {
+  return MOONBIT_IN_ROOT(ptr) ||
+         !MOONBIT_CHECK_CYCLE_STATUS(
+             ptr, moonbit_CYCLE_STATUS_ACYCLIC_OR_CANDIDATE);
+}
+
+// Drop specialization emits a [possible_root] call on every decref of a
+// cycle-capable object that does not reach zero, so this is one of the hottest
+// paths in the runtime. Most calls are for an object already in the root
+// buffer and do nothing but re-mark it a candidate, so only the append branch
+// costs a call. The gate lives inside the body rather than around the
+// definition because generated code emits the call unconditionally.
+static inline void moonbit_possible_root(void *ptr) {
+#if MOONBIT_TRIAL_DELETION
+  // In-root nodes can become LIVE after an incref. A later decref makes
+  // them candidates again without adding a duplicate root entry.
+  set_cycle_status(ptr, moonbit_CYCLE_STATUS_ACYCLIC_OR_CANDIDATE);
+  if (MOONBIT_IN_ROOT(ptr)) {
+    return;
+  }
+  // [push_root] owns the rest: it publishes the entry (in_root). It never
+  // collects, so buffering a root in the middle of a drop is safe.
+  moonbit_push_root(ptr);
+#else
+  (void)ptr;
+#endif
+}
+
+#if MOONBIT_TRIAL_DELETION
+static inline void moonbit_add_possible_root(void *ptr) {
+  if (moonbit_cycle_capable(ptr)) {
+    moonbit_possible_root(ptr);
+  }
+}
+static inline void moonbit_mark_live(void *ptr) {
+  if (moonbit_cycle_capable(ptr)) {
+    set_cycle_status(ptr, moonbit_CYCLE_STATUS_LIVE);
+  }
+}
+#define MOONBIT_ADD_POSSIBLE_ROOT(ptr) moonbit_add_possible_root(ptr)
+#define MOONBIT_MARK_LIVE(ptr) moonbit_mark_live(ptr)
+#else
+#define MOONBIT_ADD_POSSIBLE_ROOT(ptr) ((void)0)
+#define MOONBIT_MARK_LIVE(ptr) ((void)0)
+#endif
 
 MOONBIT_EXPORT void moonbit_update_ref_valtype_rc(int32_t len, void *value, uint32_t header);
 

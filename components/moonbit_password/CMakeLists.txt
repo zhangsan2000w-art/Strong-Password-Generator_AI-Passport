@@ -6,6 +6,7 @@ set(GENERATED_WORDLIST_C "${GENERATED_DIR}/eff_short_wordlist.c")
 
 set(MOONBIT_SOURCES
     "${MOONBIT_SOURCE_DIR}/battery.mbt"
+    "${MOONBIT_SOURCE_DIR}/ble_keyboard.mbt"
     "${MOONBIT_SOURCE_DIR}/diagnostics.mbt"
     "${MOONBIT_SOURCE_DIR}/entropy.mbt"
     "${MOONBIT_SOURCE_DIR}/ffi.mbt"

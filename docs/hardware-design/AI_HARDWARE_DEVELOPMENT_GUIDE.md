@@ -35,7 +35,7 @@ The target is the ESP32-C3 FoloToy AI Passport with ESP-IDF 5.5.3. It has 8 MB F
 | Audio | ES8311 playback and microphone | shared I2C + I2S0 full duplex | Playback and recording page |
 | Battery | CW2017 fuel gauge | shared I2C0, address `0x63` | Optional SOC and voltage driver |
 | Wi-Fi | 2.4 GHz station | initialized by the demo | Scan page |
-| Bluetooth LE | NimBLE peripheral | initialized by the demo | Non-connectable advertising page |
+| Bluetooth LE | NimBLE + ESP HID peripheral | product initializes at boot; demo initializes on entry | Connectable `FoloPassKey` keyboard; non-connectable validation page retained |
 | Low power | light/deep sleep | RTC timer wake | 2 s light and 5 s deep-sleep modes |
 | Console | USB Serial/JTAG | native USB GPIO18/19 | Configured |
 
@@ -73,8 +73,8 @@ LCD reset and amplifier enable are `-1`: display reset uses software reset, and 
 | I2S0 | audio BSP | TX and RX are full duplex and share MCLK/BCLK/WS. |
 | USB Serial/JTAG | console configuration | GPIO18/19 are part of the selected console path. |
 | Internal RAM/DMA | display, LVGL, audio, radio, tasks | No PSRAM exists; total free heap and largest contiguous block both matter. |
-| NVS/network event loop | `demo_radio.c` | Prepared once for Wi-Fi/BLE demos; do not erase unrelated NVS data on initialization errors. |
-| Wi-Fi/BLE stacks | individual demo pages | Current demos start on page entry and deinitialize on exit; the stacks do not remain active together. |
+| NVS/network event loop | `settings_store.c` / `password_ble_keyboard.c` / `demo_radio.c` | Product settings and BLE bonds share NVS; demos prepare their own network prerequisites. Never erase unrelated NVS data on initialization errors. |
+| Wi-Fi/BLE stacks | product BLE adapter or individual demo pages | The password product keeps one NimBLE HID peripheral active; validation demos retain page-scoped radio lifecycles. Do not run the product and demo lifecycles together. |
 
 GPIO0 is both the button ADC node and an ESP32-C3 boot-related pin. GPIO21 is the backlight output and conflicts with the commonly used UART0 TX mapping. Pin reassignment requires boot/programming-path review and on-device acceptance.
 
@@ -101,7 +101,7 @@ Display/LVGL is a hard dependency. Buttons, audio, and battery are soft dependen
 
 Button callbacks run in the shared `esp_timer` task. They only enqueue input and return; the demo lifecycle task handles navigation and starts or stops slow services without holding the LVGL lock. Page exit first completes a bounded producer stop, then deletes timers and UI objects while holding the lock. Audio and light-sleep workers use cooperative cancellation and an explicit exit handshake rather than forced task deletion. The low-power worker suspends ES8311 before either sleep mode and resumes it after light sleep; deep-sleep wake restarts the application and follows normal BSP initialization.
 
-Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. `demo_radio.c` owns shared NVS, `esp_netif`, and default-event-loop setup. Wi-Fi and Bluetooth pages allocate their radio stacks after page creation and stop/deinitialize them before page deletion. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
+Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. The password product initializes one NimBLE HID keyboard at boot and persists only bond material in NVS; its worker sends from a bounded queue and wipes transient password copies. The validation firmware still uses `demo_radio.c` for shared NVS, `esp_netif`, and default-event-loop setup, and its Wi-Fi/Bluetooth pages stop their radio stacks before page deletion. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
 
 ## 5. Display and LVGL
 
@@ -248,7 +248,7 @@ General board acceptance:
 | Codec/I2S | 1 kHz tone, non-zero recording, correct playback speed, format changes, page exit |
 | Battery | plausible SOC/mV, graceful missing-device behavior, intermittent-I2C recovery |
 | Wi-Fi | visible scan count/SSID/RSSI, rescan, repeated entry/exit |
-| Bluetooth LE | phone sees `FoloPassport`, restart advertising, advertising stops on exit, repeated entry/exit |
+| Bluetooth LE | product pairs as `FoloPassKey`, shows the same six-digit code requested by the host, reconnects bonded peers, types every generated ASCII character once, and resumes advertising after disconnect; validation page still verifies `FoloPassport` restart/exit lifecycle |
 | Light/deep sleep | select with UP/DOWN; confirm ES8311 suspend before both modes; 2 s light sleep resumes codec/audio and backlight; 5 s deep sleep restarts with timer cause, retained count, and working audio after reinitialization |
 | DMA/memory/UI | build memory report, runtime minimum heap/largest block, stable concurrent audio/display |
 

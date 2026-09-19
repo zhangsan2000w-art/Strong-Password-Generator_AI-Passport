@@ -30,6 +30,10 @@ uint64_t passport_moonbit_with_policy_settings(uint64_t state, int32_t profile, 
 uint64_t passport_moonbit_handle_input(uint64_t state, int32_t input);
 int32_t passport_moonbit_state_get(uint64_t state, int32_t requested);
 int32_t passport_moonbit_state_action(uint64_t state);
+int32_t passport_moonbit_ble_keyboard_report(int32_t character);
+int32_t passport_moonbit_ble_keyboard_status(int32_t status);
+int32_t passport_moonbit_ble_keyboard_send_allowed(uint64_t state, int32_t status);
+int32_t passport_moonbit_ble_keyboard_input_allowed(int32_t status);
 int32_t passport_moonbit_generate(uint64_t state);
 int32_t passport_moonbit_entropy_x10(uint64_t state);
 int32_t passport_moonbit_strength(uint64_t state);
@@ -50,6 +54,7 @@ int32_t passport_moonbit_view_parameter_editing(uint64_t state, int32_t slot);
 int32_t passport_moonbit_view_mode_selected(uint64_t state, int32_t mode);
 int32_t passport_moonbit_view_mode_focused(uint64_t state, int32_t mode);
 int32_t passport_moonbit_view_generate_focused(uint64_t state);
+int32_t passport_moonbit_view_send_focused(uint64_t state);
 int32_t passport_moonbit_view_theme(uint64_t state);
 uint64_t passport_moonbit_with_theme(uint64_t state, int32_t theme);
 uint64_t passport_moonbit_settings_initial(int32_t theme, int32_t sound_enabled, int32_t policy_profile, int32_t exclude_ambiguous);

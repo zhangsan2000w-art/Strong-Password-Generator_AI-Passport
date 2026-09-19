@@ -89,6 +89,9 @@ test "generate focus is mode-specific" {
   pin = handle_input(pin, input_ok)
   pin = handle_input(pin, input_down)
   @test.assert_eq(view_generate_focused(pin), true)
+  pin = handle_input(pin, input_down)
+  @test.assert_eq(view_generate_focused(pin), false)
+  @test.assert_eq(view_send_focused(pin), true)
 }
 
 ///|

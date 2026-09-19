@@ -204,6 +204,12 @@ pub fn view_mode_focused(state : UInt64, mode : Int) -> Bool {
 ///|
 pub fn view_generate_focused(state : UInt64) -> Bool {
   let mode = state_get(state, state_field_mode)
+  state_get(state, state_field_focus) == mode_generate_focus(mode)
+}
+
+///|
+pub fn view_send_focused(state : UInt64) -> Bool {
+  let mode = state_get(state, state_field_mode)
   state_get(state, state_field_focus) == mode_max_focus(mode)
 }
 

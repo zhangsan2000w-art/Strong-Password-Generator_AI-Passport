@@ -143,6 +143,9 @@ pub let action_none : Int = 0
 pub let action_generate : Int = 1
 
 ///|
+pub let action_send : Int = 2
+
+///|
 pub let result_empty : Int = 0
 
 ///|
@@ -363,10 +366,15 @@ pub fn apply_input(state : UInt64, input : Int) -> UInt64 {
 ///|
 pub fn mode_max_focus(mode : Int) -> Int {
   match mode {
-    0 => 6
-    1 => 5
-    _ => 2
+    0 => 7
+    1 => 6
+    _ => 3
   }
+}
+
+///|
+pub fn mode_generate_focus(mode : Int) -> Int {
+  mode_max_focus(mode) - 1
 }
 
 ///|
@@ -506,8 +514,14 @@ pub fn handle_input(original : UInt64, input : Int) -> UInt64 {
   if input != input_ok {
     return state
   }
-  if focus == mode_max_focus(mode) {
+  if focus == mode_generate_focus(mode) {
     return set_field(state, action_shift, 3, action_generate)
+  }
+  if focus == mode_max_focus(mode) {
+    if state_get(state, state_field_result) == result_success {
+      return set_field(state, action_shift, 3, action_send)
+    }
+    return state
   }
   if is_toggle(mode, focus) {
     if mode == 0 && focus == 2 {

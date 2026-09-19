@@ -37,7 +37,7 @@ AI 应先完成以下检查：
 | 音频 | ES8311，播放 + 麦克风录音 | I2C 控制 + I2S0 全双工 | 播放与录音页 |
 | 电池 | CW2017 电量计 | 共享 I2C0，地址 0x63 | 可缺省 SOC/电压驱动 |
 | Wi-Fi | ESP32-C3 2.4 GHz STA | 应用页按需初始化 | 扫描页 |
-| Bluetooth LE | ESP32-C3 NimBLE peripheral | 应用页按需初始化 | 不可连接广播页 |
+| Bluetooth LE | ESP32-C3 NimBLE + ESP HID peripheral | 产品启动时初始化；demo 进入页面时初始化 | 可连接的 `FoloPassKey` 键盘；保留不可连接验证页 |
 | 低功耗 | ESP32-C3 light/deep sleep | RTC timer 唤醒 | 2 秒 light sleep 和 5 秒 deep sleep 模式 |
 | 日志 | USB Serial/JTAG | 原生 USB GPIO18/19 | 已配置 |
 
@@ -77,8 +77,8 @@ LCD RST 和功放 PA 使能均定义为 `-1`：LCD 复位使用软件路径，�
 | I2S0 | 音频 BSP | TX/RX 全双工，共用 MCLK/BCLK/WS。 |
 | USB Serial/JTAG | 控制台配置 | GPIO18/19 属于当前控制台路径。 |
 | 内部 RAM/DMA | 显示、LVGL、音频、无线、任务 | 无 PSRAM；总空闲堆和最大连续块都必须检查。 |
-| NVS/网络 event loop | `demo_radio.c` | 为 Wi-Fi/BLE demo 一次性准备；初始化失败时不得擦除无关 NVS 数据。 |
-| Wi-Fi/BLE 协议栈 | 各自 demo 页面 | 当前页面进入时启动、退出时释放，不同时常驻。 |
+| NVS/网络 event loop | `settings_store.c`／`password_ble_keyboard.c`／`demo_radio.c` | 产品设置与 BLE bond 共用 NVS；demo 单独准备网络前置。初始化失败时不得擦除无关 NVS 数据。 |
+| Wi-Fi/BLE 协议栈 | 产品 BLE adapter 或各自 demo 页面 | 密码产品常驻一个 NimBLE HID peripheral；验证 demo 仍按页面管理 radio 生命周期。两套生命周期不可同时运行。 |
 
 GPIO0 同时是按键 ADC 节点和 ESP32-C3 启动相关管脚；GPIO21 是背光输出，并与常见 UART0 TX 映射冲突。重分配引脚必须复核启动/烧录路径并完成实机验收。
 
@@ -123,7 +123,7 @@ app_main
 
 按键回调运行在共享 `esp_timer` 任务中，只负责将输入加入队列并立即返回。demo 生命周期任务负责页面导航，并在不持有 LVGL 锁时启动或停止慢服务。退出页面时先以有界等待停止 producer，再持锁删除定时器和 UI 对象。音频与 light-sleep 工作任务使用协作取消和明确的退出握手，不再强制删除仍可能访问外设或 UI 的任务。低功耗工作任务会在两种睡眠前暂停 ES8311，并在 light sleep 返回后恢复；deep sleep 唤醒会重启应用并走正常 BSP 初始化流程。
 
-Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。`demo_radio.c` 只管理 NVS、`esp_netif` 和默认 event loop 这些应用级共享前置。Wi-Fi 和 BLE 页在页面创建后初始化高内存占用的无线栈，在删除页面前停止并释放；不自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
+Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。密码产品启动时初始化一个 NimBLE HID 键盘，NVS 只持久化 bond 数据；发送 worker 使用有界队列并在结束后擦除密码临时副本。验证固件仍由 `demo_radio.c` 管理 NVS、`esp_netif` 和默认 event loop，Wi-Fi/BLE 页在删除前停止无线栈。不得自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
 
 ## 5. 显示与 LVGL
 
@@ -439,7 +439,7 @@ idf.py flash monitor
 | codec/I2S | 1 kHz 音调频率/速度、录音非零且回放速度正确、格式切换、退出页面 |
 | 电池 | 合理 SOC 和 mV、无电量计时正确降级、断续 I2C 的错误恢复表现 |
 | Wi-Fi | 扫描总数和 SSID/RSSI 可见、OK 重扫描、反复进出后仍可扫描 |
-| Bluetooth LE | 手机看到 `FoloPassport`、OK 重启广播、退出后广播消失、反复进出无重启 |
+| Bluetooth LE | 产品以 `FoloPassKey` 配对，屏幕 6 位码与主机提示一致，bond 后可重连，每个生成 ASCII 字符只输入一次，断开后恢复广播；验证页仍检查 `FoloPassport` 重启／退出生命周期 |
 | light/deep sleep | Low Power 页用 UP/DOWN 选择、OK 执行；确认两种模式前 ES8311 均 suspend；light sleep 约 2 秒后恢复 codec/音频和背光；deep sleep 约 5 秒后重启，页面显示 timer 唤醒与 RTC 保留计数，并确认音频重新初始化后可用 |
 | DMA/内存/UI | build 内存报告、运行时最小堆/最大块、音频与刷屏并发稳定性 |
 

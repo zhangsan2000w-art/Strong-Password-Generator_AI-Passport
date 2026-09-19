@@ -4,7 +4,7 @@ English | [简体中文](README.zh_CN.md)
 
 **Strong Password Generator_AI Passport** is an offline three-button password generator built for the FoloToy AI Passport and MoonBit Hackathon 2026.
 
-The firmware starts directly in the generator. It does not connect to a network, transmit generated values, store password history, or redefine the system power button.
+The firmware starts directly in the generator. It does not connect to a network, store password history, or redefine the system power button. A generated value leaves the device only after the user explicitly selects **Send**, through the paired encrypted BLE HID keyboard connection.
 
 ## Features
 
@@ -13,6 +13,7 @@ The firmware starts directly in the generator. It does not connect to a network,
 - **PIN**: 4–12 decimal digits, default length 6.
 - **Input**: `UP`, `DOWN`, and `OK` only. `OK` enters or confirms editing, toggles Boolean values, or generates. Holding `UP` / `DOWN` continuously changes a numeric value while editing. Long-pressing `OK` cancels an edit or opens Settings when the main screen is not editing.
 - **Feedback**: MoonBit generates the success chime's frequencies, durations, envelope, and PCM samples; the C audio task only performs non-blocking playback. The chime can be disabled in Settings.
+- **BLE keyboard**: pair the device named `FoloPassKey`, enter the six-digit passkey shown on the AI Passport, focus a field on the host, and select **Send** to type the current password as a US-layout keyboard.
 - **Display**: switchable 240×320 cyberpunk and blue-sky themes with a 17px, 4bpp, strongly hinted CJK subset. MoonBit view models own parameter slots, focus, layout, theme and settings state, strength color, and battery presentation policy.
 - **Core**: generation, unbiased indexes, output postconditions, entropy and strength, state transitions, settings input policy, view models, battery policy, and sound synthesis are implemented in MoonBit.
 
@@ -22,12 +23,12 @@ The firmware starts directly in the generator. It does not connect to a network,
 - Use `UP` / `DOWN` to select **Theme** or **Sound**, press `OK` to change the selected value, and long-press `OK` to return.
 - **Theme** switches between the dark cyberpunk interface and the blue-sky, clouds, and grass interface.
 - **Sound** enables or disables the success chime without affecting password generation.
-- Theme and sound preferences are loaded from and asynchronously saved to ESP-IDF NVS. Generated passwords and password history are never persisted.
+- Theme and sound preferences and up to three BLE bond records are stored in ESP-IDF NVS. Generated passwords and password history are never persisted.
 - If NVS is unavailable, the selected values still apply for the current session and the firmware logs a warning. The application does not erase the NVS partition automatically.
 
 ## MoonBit-first implementation
 
-The repository now contains 1,610 production `.mbt` lines and 702 MoonBit test lines, 2,312 in total. Excluding tests, blank lines, and comments leaves 1,361 effective production MoonBit lines. `tools/check_repo.py` independently enforces at least 1,000 effective production lines; tests cannot satisfy that gate.
+The repository now contains 2,804 production `.mbt` lines and 1,255 MoonBit test lines, 4,059 in total. Excluding tests, blank lines, and comments leaves 2,397 effective production MoonBit lines. `tools/check_repo.py` independently enforces at least 1,000 effective production lines; tests cannot satisfy that gate.
 
 The production MoonBit modules are compiled into and called by the ESP-IDF firmware. They own:
 
@@ -38,9 +39,10 @@ The production MoonBit modules are compiled into and called by the ESP-IDF firmw
 - settings focus, button-gesture mapping, theme selection, and sound policy;
 - parameter slot, coordinate, focus, editing, and value view models;
 - pure policy for resolving raw CW2017 readings into a display value;
+- BLE keyboard state, send eligibility, and the complete printable-ASCII to USB HID report mapping;
 - success-note sequencing, attack/release envelopes, and PCM sample generation.
 
-C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readings, FreeRTOS scheduling, the NVS persistence adapter, codec writes, the secure-random source, and Flash dictionary access.
+C is restricted to ESP-IDF/BSP initialization, LVGL widget calls, raw I2C readings, FreeRTOS scheduling, the NVS persistence adapter, NimBLE HID transport, codec writes, the secure-random source, and Flash dictionary access.
 
 ## Upstream and attribution
 
@@ -139,4 +141,4 @@ Flashing the merged image at `0x0` can reset the NVS region. After initial provi
 
 ## Verification status
 
-The current tree defines 44 MoonBit tests. MoonBit strict checking, the 1,361-line effective production gate, repository checks, 11 Python firmware-layout tests, and the ESP-IDF 5.5.3 firmware build and merged-image verification passed locally. The local native MoonBit test executable could not be built because the detected legacy Windows C compiler cannot find `stdint.h`; this is an environment failure, not a recorded test pass. The dual-theme Settings screen, preference persistence across reboot, sound toggle, fonts, buttons, battery behavior, and RNG adapter still require physical-device validation.
+The current tree defines 69 MoonBit tests. MoonBit strict checking, the 2,397-line effective production gate, repository checks, 11 Python firmware-layout tests, and the ESP-IDF 5.5.3 firmware build and merged-image verification passed locally. The local native MoonBit test executable could not be built because the detected legacy Windows C compiler cannot find `stdint.h`; this is an environment failure, not a recorded test pass. BLE pairing and typing, the dual-theme Settings screen, preference persistence across reboot, sound toggle, fonts, buttons, battery behavior, and RNG adapter still require physical-device validation.

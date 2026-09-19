@@ -421,9 +421,16 @@ test "state switches modes edits toggles generates and regenerates" {
   @test.assert_eq(state_action(state), action_generate)
   state = handle_input(state, input_ok)
   @test.assert_eq(state_action(state), action_generate)
+  state = handle_input(state, input_down)
+  @test.assert_eq(state_get(state, state_field_focus), 7)
+  state = handle_input(state, input_ok)
+  @test.assert_eq(state_action(state), action_none)
+  state = record_generation_result(state, generate_ok)
+  state = handle_input(state, input_ok)
+  @test.assert_eq(state_action(state), action_send)
   state = handle_input(state, input_ok_long)
   @test.assert_eq(state_action(state), action_none)
-  @test.assert_eq(state_get(state, state_field_focus), 6)
+  @test.assert_eq(state_get(state, state_field_focus), 7)
 }
 
 ///|

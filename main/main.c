@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "moonbit_password.h"
 #include "password_app.h"
+#include "password_ble_keyboard.h"
 #include "password_platform.h"
 #include "password_sound.h"
 #include "settings_store.h"
@@ -121,9 +122,14 @@ void app_main(void)
         ESP_LOGW(TAG, "Success sound unavailable: %s", esp_err_to_name(sound_error));
     }
 
+    esp_err_t ble_error = password_ble_keyboard_init();
+    if (ble_error != ESP_OK) {
+        ESP_LOGW(TAG, "BLE keyboard unavailable: %s", esp_err_to_name(ble_error));
+    }
+
     ESP_LOGI(
         TAG,
-        "Ready: secure_random=%d buttons=%d",
-        password_platform_ready(), s_input_ready
+        "Ready: secure_random=%d buttons=%d ble_keyboard=%d",
+        password_platform_ready(), s_input_ready, ble_error == ESP_OK
     );
 }

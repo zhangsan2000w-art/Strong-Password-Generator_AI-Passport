@@ -183,6 +183,41 @@ pub fn passport_moonbit_state_action(state : UInt64) -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_ble_keyboard_report")
+pub fn passport_moonbit_ble_keyboard_report(character : Int) -> Int {
+  ble_keyboard_report(character)
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_status")
+pub fn passport_moonbit_ble_keyboard_status(status : Int) -> Int {
+  ble_keyboard_status_normalize(status)
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_send_allowed")
+pub fn passport_moonbit_ble_keyboard_send_allowed(
+  state : UInt64,
+  status : Int,
+) -> Int {
+  if ble_keyboard_send_allowed(state, status) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_input_allowed")
+pub fn passport_moonbit_ble_keyboard_input_allowed(status : Int) -> Int {
+  if ble_keyboard_input_allowed(status) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
 #export_name("passport_moonbit_generate")
 pub fn passport_moonbit_generate(state : UInt64) -> Int {
   platform_output_reset()
@@ -372,6 +407,16 @@ pub fn passport_moonbit_view_mode_focused(state : UInt64, mode : Int) -> Int {
 #export_name("passport_moonbit_view_generate_focused")
 pub fn passport_moonbit_view_generate_focused(state : UInt64) -> Int {
   if view_generate_focused(state) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_view_send_focused")
+pub fn passport_moonbit_view_send_focused(state : UInt64) -> Int {
+  if view_send_focused(state) {
     1
   } else {
     0

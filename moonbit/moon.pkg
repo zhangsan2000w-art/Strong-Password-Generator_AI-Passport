@@ -1,5 +1,7 @@
 pkgtype(kind: "foreign_library")
 
+warnings = "-test_unqualified_package"
+
 import {
   "moonbitlang/core/test",
 } for "test"

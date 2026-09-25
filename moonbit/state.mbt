@@ -131,6 +131,9 @@ pub let input_ok : Int = 2
 pub let input_ok_long : Int = 3
 
 ///|
+pub let input_open_settings : Int = 4
+
+///|
 pub let theme_cyber : Int = 0
 
 ///|
@@ -144,6 +147,9 @@ pub let action_generate : Int = 1
 
 ///|
 pub let action_send : Int = 2
+
+///|
+pub let action_open_settings : Int = 3
 
 ///|
 pub let result_empty : Int = 0
@@ -486,7 +492,15 @@ pub fn handle_input(original : UInt64, input : Int) -> UInt64 {
     return state
   }
   if input == input_ok_long {
-    return state
+    let next_theme = if state_get(state, state_field_theme) == theme_sky {
+      theme_cyber
+    } else {
+      theme_sky
+    }
+    return with_theme(state, next_theme)
+  }
+  if input == input_open_settings {
+    return set_field(state, action_shift, 3, action_open_settings)
   }
   if focus == 0 {
     if input == input_up {

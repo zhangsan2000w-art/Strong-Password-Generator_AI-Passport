@@ -7,7 +7,6 @@
 #include "esp_hid_common.h"
 #include "esp_hidd.h"
 #include "esp_log.h"
-#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -66,18 +65,16 @@ static QueueHandle_t s_send_queue;
 static TaskHandle_t s_send_task;
 static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
 static volatile password_ble_status_t s_status = PASSWORD_BLE_STARTING;
-static volatile uint32_t s_passkey;
 static volatile bool s_encrypted;
 static volatile bool s_subscribed;
 static uint8_t s_address_type;
 
 void ble_store_config_init(void);
 
-static void set_status(password_ble_status_t status, uint32_t passkey)
+static void set_status(password_ble_status_t status)
 {
     portENTER_CRITICAL(&s_state_lock);
     s_status = status;
-    s_passkey = passkey;
     portEXIT_CRITICAL(&s_state_lock);
 }
 
@@ -88,15 +85,6 @@ password_ble_status_t password_ble_keyboard_status(void)
     status = s_status;
     portEXIT_CRITICAL(&s_state_lock);
     return status;
-}
-
-uint32_t password_ble_keyboard_passkey(void)
-{
-    uint32_t passkey;
-    portENTER_CRITICAL(&s_state_lock);
-    passkey = s_passkey;
-    portEXIT_CRITICAL(&s_state_lock);
-    return passkey;
 }
 
 static bool transport_ready(void)
@@ -110,7 +98,7 @@ static bool transport_ready(void)
 
 static void update_connection_status(void)
 {
-    if (transport_ready()) set_status(PASSWORD_BLE_CONNECTED, 0);
+    if (transport_ready()) set_status(PASSWORD_BLE_CONNECTED);
 }
 
 static int start_advertising(void)
@@ -139,7 +127,7 @@ static int start_advertising(void)
     rc = ble_gap_adv_start(
         s_address_type, NULL, BLE_HS_FOREVER, &params, NULL, NULL
     );
-    if (rc == 0) set_status(PASSWORD_BLE_ADVERTISING, 0);
+    if (rc == 0) set_status(PASSWORD_BLE_ADVERTISING);
     return rc;
 }
 
@@ -153,7 +141,7 @@ static int gap_event(struct ble_gap_event *event, void *argument)
             s_encrypted = false;
             s_subscribed = false;
             portEXIT_CRITICAL(&s_state_lock);
-            set_status(PASSWORD_BLE_PAIRING, 0);
+            set_status(PASSWORD_BLE_PAIRING);
         }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
@@ -161,7 +149,7 @@ static int gap_event(struct ble_gap_event *event, void *argument)
         s_encrypted = false;
         s_subscribed = false;
         portEXIT_CRITICAL(&s_state_lock);
-        set_status(PASSWORD_BLE_ADVERTISING, 0);
+        set_status(PASSWORD_BLE_ADVERTISING);
         break;
     case BLE_GAP_EVENT_SUBSCRIBE:
         portENTER_CRITICAL(&s_state_lock);
@@ -170,7 +158,7 @@ static int gap_event(struct ble_gap_event *event, void *argument)
         if (event->subscribe.cur_notify != 0) {
             update_connection_status();
         } else {
-            set_status(PASSWORD_BLE_PAIRING, 0);
+            set_status(PASSWORD_BLE_PAIRING);
         }
         break;
     case BLE_GAP_EVENT_ENC_CHANGE:
@@ -180,7 +168,7 @@ static int gap_event(struct ble_gap_event *event, void *argument)
         if (event->enc_change.status == 0) {
             update_connection_status();
         } else {
-            set_status(PASSWORD_BLE_PAIRING, 0);
+            set_status(PASSWORD_BLE_PAIRING);
         }
         break;
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
@@ -193,19 +181,6 @@ static int gap_event(struct ble_gap_event *event, void *argument)
         }
         break;
     }
-    case BLE_GAP_EVENT_PASSKEY_ACTION:
-        if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
-            struct ble_sm_io response = {0};
-            response.action = BLE_SM_IOACT_DISP;
-            response.passkey = esp_random() % 1000000U;
-            set_status(PASSWORD_BLE_PAIRING, response.passkey);
-            if (ble_sm_inject_io(
-                    event->passkey.conn_handle, &response
-                ) != 0) {
-                set_status(PASSWORD_BLE_ERROR, 0);
-            }
-        }
-        break;
     default:
         break;
     }
@@ -227,16 +202,16 @@ static void hid_event(
         if (ble_hs_util_ensure_addr(0) != 0 ||
             ble_hs_id_infer_auto(0, &s_address_type) != 0 ||
             start_advertising() != 0) {
-            set_status(PASSWORD_BLE_ERROR, 0);
+            set_status(PASSWORD_BLE_ERROR);
         }
         break;
     case ESP_HIDD_CONNECT_EVENT:
         if (password_ble_keyboard_status() != PASSWORD_BLE_CONNECTED) {
-            set_status(PASSWORD_BLE_PAIRING, password_ble_keyboard_passkey());
+            set_status(PASSWORD_BLE_PAIRING);
         }
         break;
     case ESP_HIDD_DISCONNECT_EVENT:
-        if (start_advertising() != 0) set_status(PASSWORD_BLE_ERROR, 0);
+        if (start_advertising() != 0) set_status(PASSWORD_BLE_ERROR);
         break;
     default:
         break;
@@ -298,11 +273,11 @@ static void send_task(void *argument)
         esp_err_t result = type_password(request.value);
         mbedtls_platform_zeroize(&request, sizeof(request));
         if (result == ESP_OK && transport_ready()) {
-            set_status(PASSWORD_BLE_SENT, 0);
+            set_status(PASSWORD_BLE_SENT);
         } else if (transport_ready()) {
-            set_status(PASSWORD_BLE_ERROR, 0);
+            set_status(PASSWORD_BLE_ERROR);
         } else if (s_hid_device && esp_hidd_dev_connected(s_hid_device)) {
-            set_status(PASSWORD_BLE_PAIRING, 0);
+            set_status(PASSWORD_BLE_PAIRING);
         }
     }
 }
@@ -327,9 +302,9 @@ esp_err_t password_ble_keyboard_init(void)
     error = nimble_port_init();
     if (error != ESP_OK) goto fail;
 
-    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_DISP_ONLY;
+    ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
     ble_hs_cfg.sm_bonding = 1;
-    ble_hs_cfg.sm_mitm = 1;
+    ble_hs_cfg.sm_mitm = 0;
     ble_hs_cfg.sm_sc = 1;
     ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ID |
         BLE_SM_PAIR_KEY_DIST_ENC;
@@ -348,7 +323,7 @@ esp_err_t password_ble_keyboard_init(void)
         goto fail_hid;
     }
 
-    set_status(PASSWORD_BLE_STARTING, 0);
+    set_status(PASSWORD_BLE_STARTING);
     nimble_port_freertos_init(host_task);
     return ESP_OK;
 
@@ -366,7 +341,7 @@ fail:
         vQueueDelete(s_send_queue);
         s_send_queue = NULL;
     }
-    set_status(PASSWORD_BLE_ERROR, 0);
+    set_status(PASSWORD_BLE_ERROR);
     ESP_LOGE(TAG, "BLE keyboard initialization failed: %s", esp_err_to_name(error));
     return error;
 }
@@ -386,7 +361,7 @@ esp_err_t password_ble_keyboard_send(const char *password)
     BaseType_t queued = xQueueSend(s_send_queue, &request, 0);
     mbedtls_platform_zeroize(&request, sizeof(request));
     if (queued != pdTRUE) return ESP_ERR_INVALID_STATE;
-    set_status(PASSWORD_BLE_SENDING, 0);
+    set_status(PASSWORD_BLE_SENDING);
     return ESP_OK;
 }
 
@@ -395,6 +370,6 @@ void password_ble_keyboard_reset_feedback(void)
     password_ble_status_t status = password_ble_keyboard_status();
     if ((status == PASSWORD_BLE_SENT || status == PASSWORD_BLE_ERROR) &&
         transport_ready()) {
-        set_status(PASSWORD_BLE_CONNECTED, 0);
+        set_status(PASSWORD_BLE_CONNECTED);
     }
 }

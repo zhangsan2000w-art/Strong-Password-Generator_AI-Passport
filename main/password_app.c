@@ -20,13 +20,13 @@ LV_FONT_DECLARE(passport_font_zh_16);
 enum {
     FIELD_MODE = 0,
     FIELD_RESULT = 11,
-    FIELD_EDITING = 2,
     FIELD_POLICY_PROFILE = 14,
 };
 
 enum {
     ACTION_GENERATE = 1,
     ACTION_SEND = 2,
+    ACTION_OPEN_SETTINGS = 3,
     RESULT_SUCCESS = 1,
     RESULT_FAILURE = 2,
     BUTTON_UP = 0,
@@ -302,7 +302,6 @@ static void refresh_ble(lv_timer_t *timer)
     int status = passport_moonbit_ble_keyboard_status(
         password_ble_keyboard_status()
     );
-    uint32_t passkey = password_ble_keyboard_passkey();
     switch (status) {
     case PASSWORD_BLE_STARTING:
         lv_label_set_text(s_ble_label, "BLE 启动中");
@@ -311,11 +310,7 @@ static void refresh_ble(lv_timer_t *timer)
         lv_label_set_text(s_ble_label, "BLE: 配对 FoloPassKey");
         break;
     case PASSWORD_BLE_PAIRING:
-        if (passkey > 0) {
-            lv_label_set_text_fmt(s_ble_label, "配对码 %06lu", (unsigned long)passkey);
-        } else {
-            lv_label_set_text(s_ble_label, "BLE 配对中");
-        }
+        lv_label_set_text(s_ble_label, "BLE 连接中 无需配对码");
         break;
     case PASSWORD_BLE_CONNECTED:
         lv_label_set_text(s_ble_label, "BLE 已连接 可发送");
@@ -571,18 +566,6 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
         )) return;
     password_ble_keyboard_reset_feedback();
 
-    bool editing = state_value(FIELD_EDITING) != 0;
-    if (!editing && button == BSP_BTN_OK && event == BSP_BTN_LONG) {
-        if (settings_screen_enter(s_state, on_settings_exit)) {
-            s_in_settings = true;
-            if (bsp_lvgl_lock(500)) {
-                password_app_teardown_ui();
-                bsp_lvgl_unlock();
-            }
-        }
-        return;
-    }
-
     int button_code = button == BSP_BTN_UP ? BUTTON_UP
         : (button == BSP_BTN_DOWN ? BUTTON_DOWN
         : (button == BSP_BTN_OK ? BUTTON_OK : -1));
@@ -596,6 +579,11 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
 
     uint64_t previous = s_state;
     s_state = passport_moonbit_handle_input(s_state, input);
+    int previous_theme = passport_moonbit_view_theme(previous);
+    int next_theme = passport_moonbit_view_theme(s_state);
+    if (previous_theme != next_theme) {
+        (void)settings_store_set_theme(next_theme);
+    }
     if (passport_moonbit_configuration_changed(previous, s_state)) {
         password_platform_clear_output();
         password_ble_keyboard_reset_feedback();
@@ -604,7 +592,16 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
     }
 
     int action = passport_moonbit_state_action(s_state);
-    if (action == ACTION_GENERATE) {
+    if (action == ACTION_OPEN_SETTINGS) {
+        if (settings_screen_enter(s_state, on_settings_exit)) {
+            s_in_settings = true;
+            if (bsp_lvgl_lock(500)) {
+                password_app_teardown_ui();
+                bsp_lvgl_unlock();
+            }
+        }
+        return;
+    } else if (action == ACTION_GENERATE) {
         password_ble_keyboard_reset_feedback();
         int result = passport_moonbit_configuration_valid(s_state)
             ? passport_moonbit_generate(s_state) : -1;

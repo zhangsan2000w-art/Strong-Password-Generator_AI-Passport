@@ -11,15 +11,15 @@ The firmware starts directly in the generator. It does not connect to a network,
 - **Random**: 6–30 printable ASCII characters, default length 10, letters always enabled, optional digits and symbols. Every enabled optional class is guaranteed to appear.
 - **Memorable**: 3–6 offline words, default 4, optional capitalization, complete or four-character abbreviated words, and `-`, `.`, or `_` separators.
 - **PIN**: 4–12 decimal digits, default length 6.
-- **Input**: `UP`, `DOWN`, and `OK` only. `OK` enters or confirms editing, toggles Boolean values, or generates. Holding `UP` / `DOWN` continuously changes a numeric value while editing. Long-pressing `OK` cancels an edit or opens Settings when the main screen is not editing.
+- **Input**: `UP`, `DOWN`, and `OK` only. `OK` enters or confirms editing, toggles Boolean values, or generates. Holding `UP` / `DOWN` continuously changes a numeric value while editing. Long-pressing `OK` cancels an edit; outside editing it switches the theme. Long-pressing `DOWN` outside editing opens Settings.
 - **Feedback**: MoonBit generates the success chime's frequencies, durations, envelope, and PCM samples; the C audio task only performs non-blocking playback. The chime can be disabled in Settings.
-- **BLE keyboard**: pair the device named `FoloPassKey`, enter the six-digit passkey shown on the AI Passport, focus a field on the host, and select **Send** to type the current password as a US-layout keyboard.
+- **BLE keyboard**: pair the device named `FoloPassKey` with no passkey, focus a field on the host, and select **Send** to type the current password as a US-layout keyboard. The bonded link is encrypted, but Just Works pairing does not provide MITM authentication.
 - **Display**: switchable 240×320 cyberpunk and blue-sky themes with a 17px, 4bpp, strongly hinted CJK subset. MoonBit view models own parameter slots, focus, layout, theme and settings state, strength color, and battery presentation policy.
 - **Core**: generation, unbiased indexes, output postconditions, entropy and strength, state transitions, settings input policy, view models, battery policy, and sound synthesis are implemented in MoonBit.
 
 ## Settings and persistence
 
-- Long-press `OK` on the main screen while not editing to open Settings.
+- Long-press `OK` on the main screen while not editing to switch between cyberpunk and blue-sky themes. Long-press `DOWN` to open Settings.
 - Use `UP` / `DOWN` to select **Theme** or **Sound**, press `OK` to change the selected value, and long-press `OK` to return.
 - **Theme** switches between the dark cyberpunk interface and the blue-sky, clouds, and grass interface.
 - **Sound** enables or disables the success chime without affecting password generation.

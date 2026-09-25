@@ -43,7 +43,7 @@ If RNG initialization, mutex acquisition, DRBG generation, output bounds, or dic
 ## BLE keyboard boundary
 
 - The device advertises as `FoloPassKey` and accepts one BLE connection.
-- First pairing uses a six-digit passkey shown on the AI Passport. HID sending is disabled until the connection is encrypted and the host subscribes to the keyboard input report.
+- First pairing uses bonded Just Works with no passkey. The link is encrypted but is not MITM-authenticated; HID sending remains disabled until encryption succeeds and the host subscribes to the keyboard input report.
 - A password is transmitted only after the user focuses **Send** and presses `OK`; generation never triggers automatic typing.
 - Up to three BLE bonds may be retained so a known host can reconnect. Removing a host must be done from the host Bluetooth settings; a device-side bond-management screen is not included yet.
 - HID usages follow a US keyboard layout. The host must use an English/direct-input layout for symbols to reproduce exactly; an IME or another keyboard layout can transform the received keystrokes.
@@ -62,6 +62,6 @@ If RNG initialization, mutex acquisition, DRBG generation, output bounds, or dic
 - Confirm no generated value appears on the serial console.
 - Confirm configuration changes replace the previous display value.
 - Confirm Wi-Fi and NFC remain inactive and the system power-button behavior is unchanged.
-- Pair `FoloPassKey` on Windows, Android, and iOS where available; verify the on-screen passkey, reconnect, disconnect/re-advertise, and bond persistence after reboot.
+- Pair `FoloPassKey` on Windows, Android, and iOS where available; verify that no passkey entry is requested, then verify reconnect, disconnect/re-advertise, and bond persistence after reboot.
 - With the host in English/direct-input mode, verify every generated character types exactly once into an intentionally focused non-sensitive test field and never appears in serial logs.
 - Confirm sleep/wake and low-battery behavior on the target hardware.

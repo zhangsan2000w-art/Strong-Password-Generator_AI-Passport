@@ -50,8 +50,8 @@ CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
 CONFIG_BT_NIMBLE_SM_LEGACY=y
 CONFIG_BT_NIMBLE_SM_SC=y
 # ESP-IDF 5.5.3's HID service has a compile-time expression defect at level 3.
-# Level 2 still requires encrypted GATT access; runtime config additionally
-# requests MITM + Secure Connections with display-only passkey pairing.
+# Level 2 still requires encrypted GATT access; runtime config uses bonded
+# Secure Connections with no-input/no-output Just Works pairing.
 CONFIG_BT_NIMBLE_SM_LVL=2
 CONFIG_BT_NIMBLE_NVS_PERSIST=y
 CONFIG_BT_NIMBLE_MAX_BONDS=3

@@ -27,6 +27,9 @@ pub fn map_button_event(state : UInt64, button : Int, event : Int) -> Int {
   if button == button_ok && event == button_event_long {
     return input_ok_long
   }
+  if !editing && button == button_down && event == button_event_long {
+    return input_open_settings
+  }
   let held = event == button_event_long || event == button_event_long_hold
   if editing && held && button == button_up {
     return input_up

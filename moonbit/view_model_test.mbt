@@ -148,6 +148,10 @@ test "MoonBit maps click and held gestures by editing state" {
     map_button_event(initial, button_ok, button_event_long),
     input_ok_long,
   )
+  @test.assert_eq(
+    map_button_event(initial, button_down, button_event_long),
+    input_open_settings,
+  )
   let focused = apply_input(initial, input_ok)
   let editing = apply_input(focused, input_ok)
   @test.assert_eq(
@@ -182,9 +186,19 @@ test "with_theme sets the theme field" {
 }
 
 ///|
-test "long OK when not editing no longer toggles theme" {
+test "long OK when not editing toggles theme" {
   let initial = initial_state()
-  @test.assert_eq(view_theme(handle_input(initial, input_ok_long)), theme_cyber)
+  let sky = handle_input(initial, input_ok_long)
+  @test.assert_eq(view_theme(sky), theme_sky)
+  @test.assert_eq(view_theme(handle_input(sky, input_ok_long)), theme_cyber)
+}
+
+///|
+test "long DOWN requests settings without changing product configuration" {
+  let initial = initial_state()
+  let requested = handle_input(initial, input_open_settings)
+  @test.assert_eq(state_action(requested), action_open_settings)
+  @test.assert_eq(configuration_changed(initial, requested), false)
 }
 
 ///|

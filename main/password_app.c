@@ -35,6 +35,7 @@ enum {
     BUTTON_EVENT_CLICK = 0,
     BUTTON_EVENT_LONG = 1,
     BUTTON_EVENT_LONG_HOLD = 2,
+    PASSWORD_MASK_CAPACITY = 32,
 };
 
 enum {
@@ -66,11 +67,15 @@ static lv_obj_t *s_ble_label;
 static lv_obj_t *s_battery_label;
 static lv_timer_t *s_battery_timer;
 static lv_timer_t *s_ble_timer;
+static lv_timer_t *s_visibility_timer;
 static uint64_t s_state;
 static ui_pixel_theme_t s_theme;
 static bool s_in_settings;
 static bool s_has_password;
 static bool s_send_focused;
+static bool s_password_reveal_started;
+static uint32_t s_password_reveal_started_at;
+static int s_password_display_mode;
 
 static int state_value(int field)
 {
@@ -222,6 +227,12 @@ static void refresh_result(void)
 {
     int result = state_value(FIELD_RESULT);
     s_has_password = result == RESULT_SUCCESS;
+    uint64_t elapsed_ms = s_password_reveal_started
+        ? (uint64_t)lv_tick_elaps(s_password_reveal_started_at)
+        : passport_moonbit_password_display_timeout_ms();
+    s_password_display_mode = passport_moonbit_password_display_update(
+        s_state, s_password_display_mode, elapsed_ms
+    );
     int warning = passport_moonbit_security_warning(s_state);
     static const char *profile_names[] = {"兼容", "标准", "严格"};
     static const char *warning_names[] = {
@@ -249,10 +260,38 @@ static void refresh_result(void)
         lv_obj_set_style_text_color(s_status_label, lv_color_hex(UI_LIME), 0);
     }
     if (result == RESULT_SUCCESS) {
-        lv_label_set_text(s_result_label, password_platform_output());
+        if (passport_moonbit_password_display_is_visible(
+                s_password_display_mode
+            )) {
+            lv_label_set_text(s_result_label, password_platform_output());
+        } else {
+            char mask[PASSWORD_MASK_CAPACITY];
+            int width = passport_moonbit_password_display_mask_width();
+            int character = passport_moonbit_password_display_mask_character();
+            if (width < 1) width = 1;
+            if (width >= PASSWORD_MASK_CAPACITY) width = PASSWORD_MASK_CAPACITY - 1;
+            for (int i = 0; i < width; i++) mask[i] = (char)character;
+            mask[width] = '\0';
+            lv_label_set_text(s_result_label, mask);
+        }
     } else {
         lv_label_set_text(s_result_label, "OK -> Generate");
     }
+}
+
+static void refresh_password_visibility(lv_timer_t *timer)
+{
+    (void)timer;
+    if (!s_result_label || !s_password_reveal_started ||
+        !passport_moonbit_password_display_is_visible(
+            s_password_display_mode
+        )) return;
+
+    uint64_t elapsed_ms = (uint64_t)lv_tick_elaps(s_password_reveal_started_at);
+    int next = passport_moonbit_password_display_update(
+        s_state, s_password_display_mode, elapsed_ms
+    );
+    if (next != s_password_display_mode) refresh_result();
 }
 
 static void refresh_ble(lv_timer_t *timer)
@@ -366,6 +405,10 @@ static void password_app_teardown_ui(void)
         lv_timer_delete(s_ble_timer);
         s_ble_timer = NULL;
     }
+    if (s_visibility_timer) {
+        lv_timer_delete(s_visibility_timer);
+        s_visibility_timer = NULL;
+    }
     if (s_screen) {
         lv_obj_delete(s_screen);
         s_screen = NULL;
@@ -394,10 +437,12 @@ static void password_app_build_ui(void)
     lv_obj_t *old_screen = s_screen;
     lv_timer_t *old_battery_timer = s_battery_timer;
     lv_timer_t *old_ble_timer = s_ble_timer;
+    lv_timer_t *old_visibility_timer = s_visibility_timer;
 
     s_screen = NULL;
     s_battery_timer = NULL;
     s_ble_timer = NULL;
+    s_visibility_timer = NULL;
 
     s_theme = (ui_pixel_theme_t)passport_moonbit_view_theme(s_state);
     ui_pixel_set_theme(s_theme);
@@ -466,11 +511,13 @@ static void password_app_build_ui(void)
     lv_obj_set_width(s_ble_label, 226);
     lv_obj_set_style_text_align(s_ble_label, LV_TEXT_ALIGN_CENTER, 0);
     s_ble_timer = lv_timer_create(refresh_ble, 200, NULL);
+    s_visibility_timer = lv_timer_create(refresh_password_visibility, 200, NULL);
 
     refresh_ui();
     lv_screen_load(s_screen);
     if (old_battery_timer) lv_timer_delete(old_battery_timer);
     if (old_ble_timer) lv_timer_delete(old_ble_timer);
+    if (old_visibility_timer) lv_timer_delete(old_visibility_timer);
     if (old_screen) lv_obj_delete(old_screen);
 }
 
@@ -487,6 +534,8 @@ static bool on_settings_exit(void)
     if (passport_moonbit_configuration_changed(previous, s_state)) {
         password_platform_clear_output();
         password_ble_keyboard_reset_feedback();
+        s_password_reveal_started = false;
+        s_password_display_mode = passport_moonbit_password_display_begin(s_state);
     }
     password_app_build_ui();
     bsp_lvgl_unlock();
@@ -505,6 +554,8 @@ void password_app_enter(void)
         settings_store_exclude_ambiguous() ? 1 : 0
     );
     password_platform_clear_output();
+    s_password_reveal_started = false;
+    s_password_display_mode = passport_moonbit_password_display_begin(s_state);
     password_app_build_ui();
 }
 
@@ -548,6 +599,8 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
     if (passport_moonbit_configuration_changed(previous, s_state)) {
         password_platform_clear_output();
         password_ble_keyboard_reset_feedback();
+        s_password_reveal_started = false;
+        s_password_display_mode = passport_moonbit_password_display_begin(s_state);
     }
 
     int action = passport_moonbit_state_action(s_state);
@@ -556,8 +609,15 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
         int result = passport_moonbit_configuration_valid(s_state)
             ? passport_moonbit_generate(s_state) : -1;
         s_state = passport_moonbit_record_generation(s_state, result);
-        if (result != 0) password_platform_clear_output();
-        else if (settings_store_sound_enabled()) password_sound_play_success();
+        if (result != 0) {
+            password_platform_clear_output();
+            s_password_reveal_started = false;
+        } else {
+            s_password_reveal_started_at = lv_tick_get();
+            s_password_reveal_started = true;
+            if (settings_store_sound_enabled()) password_sound_play_success();
+        }
+        s_password_display_mode = passport_moonbit_password_display_begin(s_state);
     } else if (action == ACTION_SEND &&
                passport_moonbit_ble_keyboard_send_allowed(
                    s_state, password_ble_keyboard_status()

@@ -303,6 +303,54 @@ pub fn passport_moonbit_record_generation(
 }
 
 ///|
+#export_name("passport_moonbit_password_display_begin")
+pub fn passport_moonbit_password_display_begin(state : UInt64) -> Int {
+  password_display_begin(state_get(state, state_field_result))
+}
+
+///|
+#export_name("passport_moonbit_password_display_is_visible")
+pub fn passport_moonbit_password_display_is_visible(mode : Int) -> Int {
+  if password_display_is_visible(mode) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_password_display_update")
+pub fn passport_moonbit_password_display_update(
+  state : UInt64,
+  current : Int,
+  elapsed_ms : UInt64,
+) -> Int {
+  password_display_update(
+    current,
+    state_get(state, state_field_result),
+    elapsed_ms,
+  )
+}
+
+///|
+#export_name("passport_moonbit_password_display_timeout_ms")
+pub fn passport_moonbit_password_display_timeout_ms() -> UInt64 {
+  password_display_timeout_ms
+}
+
+///|
+#export_name("passport_moonbit_password_display_mask_width")
+pub fn passport_moonbit_password_display_mask_width() -> Int {
+  password_display_mask_width
+}
+
+///|
+#export_name("passport_moonbit_password_display_mask_character")
+pub fn passport_moonbit_password_display_mask_character() -> Int {
+  password_display_mask_character
+}
+
+///|
 #export_name("passport_moonbit_map_button_event")
 pub fn passport_moonbit_map_button_event(
   state : UInt64,

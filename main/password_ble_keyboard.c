@@ -19,12 +19,20 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "nvs_flash.h"
+#include "services/gap/ble_svc_gap.h"
 
 #define PASSWORD_BLE_DEVICE_NAME "FoloPassKey"
 #define PASSWORD_BLE_OUTPUT_CAPACITY 128
 #define PASSWORD_BLE_REPORT_ID 1
 #define PASSWORD_BLE_KEY_DOWN_MS 12
 #define PASSWORD_BLE_KEY_UP_MS 8
+#define PASSWORD_BLE_LINK_CONNECTED 0
+#define PASSWORD_BLE_LINK_DISCONNECTED 1
+#define PASSWORD_BLE_LINK_ENCRYPTED 2
+#define PASSWORD_BLE_LINK_ENCRYPTION_FAILED 3
+#define PASSWORD_BLE_LINK_RELEASED 4
+#define PASSWORD_BLE_LINK_RESUMED 5
+#define PASSWORD_BLE_RELEASE_DELAY_MS 50
 
 static const char *TAG = "password_ble";
 
@@ -65,8 +73,8 @@ static QueueHandle_t s_send_queue;
 static TaskHandle_t s_send_task;
 static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
 static volatile password_ble_status_t s_status = PASSWORD_BLE_STARTING;
-static volatile bool s_encrypted;
-static volatile bool s_subscribed;
+static volatile int32_t s_link_state;
+static uint16_t s_connection_handle = BLE_HS_CONN_HANDLE_NONE;
 static uint8_t s_address_type;
 static bool s_address_ready;
 static TickType_t s_last_advertising_attempt;
@@ -93,14 +101,55 @@ static bool transport_ready(void)
 {
     bool ready;
     portENTER_CRITICAL(&s_state_lock);
-    ready = s_encrypted && s_subscribed;
+    ready = passport_moonbit_ble_keyboard_link_ready(s_link_state) != 0;
     portEXIT_CRITICAL(&s_state_lock);
     return ready && s_hid_device && esp_hidd_dev_connected(s_hid_device);
 }
 
-static void update_connection_status(void)
+static void apply_link_event(int32_t event)
 {
-    if (transport_ready()) set_status(PASSWORD_BLE_CONNECTED);
+    int32_t link_state;
+    portENTER_CRITICAL(&s_state_lock);
+    s_link_state = passport_moonbit_ble_keyboard_link_event(
+        s_link_state, event
+    );
+    link_state = s_link_state;
+    portEXIT_CRITICAL(&s_state_lock);
+    set_status((password_ble_status_t)
+        passport_moonbit_ble_keyboard_link_status(link_state));
+}
+
+static uint16_t connection_handle(void)
+{
+    uint16_t handle;
+    portENTER_CRITICAL(&s_state_lock);
+    handle = s_connection_handle;
+    portEXIT_CRITICAL(&s_state_lock);
+    return handle;
+}
+
+static void set_connection_handle(uint16_t handle)
+{
+    portENTER_CRITICAL(&s_state_lock);
+    s_connection_handle = handle;
+    portEXIT_CRITICAL(&s_state_lock);
+}
+
+static int terminate_connection(void)
+{
+    uint16_t handle = connection_handle();
+    if (handle == BLE_HS_CONN_HANDLE_NONE) return 0;
+    int rc = ble_gap_terminate(handle, BLE_ERR_REM_USER_CONN_TERM);
+    if (rc != 0 && rc != BLE_HS_EALREADY && rc != BLE_HS_ENOTCONN) {
+        ESP_LOGW(TAG, "Failed to release HID connection: rc=%d", rc);
+    }
+    return rc;
+}
+
+static void release_keyboard(void)
+{
+    apply_link_event(PASSWORD_BLE_LINK_RELEASED);
+    (void)terminate_connection();
 }
 
 static int start_advertising(void)
@@ -164,43 +213,41 @@ static int gap_event(struct ble_gap_event *event, void *argument)
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
-            portENTER_CRITICAL(&s_state_lock);
-            s_encrypted = false;
-            s_subscribed = false;
-            portEXIT_CRITICAL(&s_state_lock);
-            set_status(PASSWORD_BLE_PAIRING);
+            set_connection_handle(event->connect.conn_handle);
+            apply_link_event(PASSWORD_BLE_LINK_CONNECTED);
+            struct ble_gap_conn_desc description;
+            uint16_t handle = connection_handle();
+            int rc = ble_gap_conn_find(handle, &description);
+            if (rc == 0 && description.sec_state.encrypted) {
+                apply_link_event(PASSWORD_BLE_LINK_ENCRYPTED);
+                break;
+            }
+            rc = ble_gap_security_initiate(handle);
+            if (rc != 0 && rc != BLE_HS_EALREADY) {
+                ESP_LOGW(TAG, "Failed to initiate link security: rc=%d", rc);
+            }
         } else {
+            set_connection_handle(BLE_HS_CONN_HANDLE_NONE);
+            apply_link_event(PASSWORD_BLE_LINK_DISCONNECTED);
             set_status(PASSWORD_BLE_ERROR);
         }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
-        portENTER_CRITICAL(&s_state_lock);
-        s_encrypted = false;
-        s_subscribed = false;
-        portEXIT_CRITICAL(&s_state_lock);
-        set_status(PASSWORD_BLE_ERROR);
+        set_connection_handle(BLE_HS_CONN_HANDLE_NONE);
+        apply_link_event(PASSWORD_BLE_LINK_DISCONNECTED);
         break;
     case BLE_GAP_EVENT_ADV_COMPLETE:
         set_status(PASSWORD_BLE_ERROR);
         break;
     case BLE_GAP_EVENT_SUBSCRIBE:
-        portENTER_CRITICAL(&s_state_lock);
-        s_subscribed = event->subscribe.cur_notify != 0;
-        portEXIT_CRITICAL(&s_state_lock);
-        if (event->subscribe.cur_notify != 0) {
-            update_connection_status();
-        } else {
-            set_status(PASSWORD_BLE_PAIRING);
-        }
+        ESP_LOGI(TAG, "HID subscription handle=%u notify=%u",
+            event->subscribe.attr_handle, event->subscribe.cur_notify);
         break;
     case BLE_GAP_EVENT_ENC_CHANGE:
-        portENTER_CRITICAL(&s_state_lock);
-        s_encrypted = event->enc_change.status == 0;
-        portEXIT_CRITICAL(&s_state_lock);
         if (event->enc_change.status == 0) {
-            update_connection_status();
+            apply_link_event(PASSWORD_BLE_LINK_ENCRYPTED);
         } else {
-            set_status(PASSWORD_BLE_PAIRING);
+            apply_link_event(PASSWORD_BLE_LINK_ENCRYPTION_FAILED);
         }
         break;
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
@@ -240,12 +287,14 @@ static void hid_event(
         }
         break;
     case ESP_HIDD_CONNECT_EVENT:
-        if (password_ble_keyboard_status() != PASSWORD_BLE_CONNECTED) {
+        if (password_ble_keyboard_status() != PASSWORD_BLE_CONNECTED &&
+            password_ble_keyboard_status() != PASSWORD_BLE_RELEASED) {
             set_status(PASSWORD_BLE_PAIRING);
         }
         break;
     case ESP_HIDD_DISCONNECT_EVENT:
-        if (!ble_gap_adv_active()) {
+        if (!ble_gap_adv_active() &&
+            password_ble_keyboard_status() != PASSWORD_BLE_RELEASED) {
             set_status(PASSWORD_BLE_ERROR);
         }
         break;
@@ -310,6 +359,8 @@ static void send_task(void *argument)
         mbedtls_platform_zeroize(&request, sizeof(request));
         if (result == ESP_OK && transport_ready()) {
             set_status(PASSWORD_BLE_SENT);
+            vTaskDelay(pdMS_TO_TICKS(PASSWORD_BLE_RELEASE_DELAY_MS));
+            release_keyboard();
         } else if (transport_ready()) {
             set_status(PASSWORD_BLE_ERROR);
         } else if (s_hid_device && esp_hidd_dev_connected(s_hid_device)) {
@@ -354,11 +405,20 @@ esp_err_t password_ble_keyboard_init(void)
     );
     if (error != ESP_OK) goto fail_nimble;
 
+    int rc = ble_svc_gap_device_name_set(PASSWORD_BLE_DEVICE_NAME);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to set GAP device name: rc=%d", rc);
+        error = ESP_FAIL;
+        goto fail_hid;
+    }
+
     if (ble_gap_event_listener_register(&s_gap_listener, gap_event, NULL) != 0) {
         error = ESP_FAIL;
         goto fail_hid;
     }
 
+    set_connection_handle(BLE_HS_CONN_HANDLE_NONE);
+    s_link_state = 0;
     set_status(PASSWORD_BLE_STARTING);
     nimble_port_freertos_init(host_task);
     return ESP_OK;
@@ -401,12 +461,44 @@ esp_err_t password_ble_keyboard_send(const char *password)
     return ESP_OK;
 }
 
+esp_err_t password_ble_keyboard_resume(void)
+{
+    if (!s_hid_device ||
+        password_ble_keyboard_status() != PASSWORD_BLE_RELEASED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (esp_hidd_dev_connected(s_hid_device)) {
+        (void)terminate_connection();
+        return ESP_ERR_INVALID_STATE;
+    }
+    apply_link_event(PASSWORD_BLE_LINK_RESUMED);
+    int rc = prepare_and_start_advertising();
+    if (rc != 0) {
+        set_status(PASSWORD_BLE_ERROR);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 void password_ble_keyboard_poll(void)
 {
     if (!s_hid_device) return;
 
     int connected = esp_hidd_dev_connected(s_hid_device) ? 1 : 0;
     int advertising = ble_gap_adv_active() ? 1 : 0;
+    if (password_ble_keyboard_status() == PASSWORD_BLE_RELEASED) {
+        if (!connected) return;
+        TickType_t now = xTaskGetTickCount();
+        TickType_t retry_ticks = pdMS_TO_TICKS(
+            passport_moonbit_ble_keyboard_retry_ms()
+        );
+        if (s_last_advertising_attempt == 0 ||
+            now - s_last_advertising_attempt >= retry_ticks) {
+            s_last_advertising_attempt = now;
+            (void)terminate_connection();
+        }
+        return;
+    }
     if (!passport_moonbit_ble_keyboard_should_advertise(
             password_ble_keyboard_status(), connected, advertising
         )) return;

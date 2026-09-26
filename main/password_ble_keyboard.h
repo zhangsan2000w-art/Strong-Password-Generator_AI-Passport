@@ -13,10 +13,12 @@ typedef enum {
     PASSWORD_BLE_SENDING = 4,
     PASSWORD_BLE_SENT = 5,
     PASSWORD_BLE_ERROR = 6,
+    PASSWORD_BLE_RELEASED = 7,
 } password_ble_status_t;
 
 esp_err_t password_ble_keyboard_init(void);
 esp_err_t password_ble_keyboard_send(const char *password);
+esp_err_t password_ble_keyboard_resume(void);
 password_ble_status_t password_ble_keyboard_status(void);
 void password_ble_keyboard_poll(void);
 void password_ble_keyboard_reset_feedback(void);

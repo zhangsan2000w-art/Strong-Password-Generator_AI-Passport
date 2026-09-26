@@ -36,6 +36,8 @@ enum {
     BUTTON_EVENT_LONG = 1,
     BUTTON_EVENT_LONG_HOLD = 2,
     PASSWORD_MASK_CAPACITY = 32,
+    BLE_ACTION_SEND = 1,
+    BLE_ACTION_RECONNECT = 2,
 };
 
 enum {
@@ -322,13 +324,20 @@ static void refresh_ble(lv_timer_t *timer)
     case PASSWORD_BLE_SENT:
         lv_label_set_text(s_ble_label, "密码已发送");
         break;
+    case PASSWORD_BLE_RELEASED:
+        lv_label_set_text(s_ble_label, "已发送，系统键盘已恢复");
+        break;
     default:
         lv_label_set_text(s_ble_label, "BLE 不可用");
         break;
     }
 
-    bool enabled = s_has_password &&
-        (status == PASSWORD_BLE_CONNECTED || status == PASSWORD_BLE_SENT);
+    int ble_action = passport_moonbit_ble_keyboard_action(s_state, status);
+    bool enabled = ble_action != 0;
+    lv_label_set_text(
+        s_send_label,
+        ble_action == BLE_ACTION_RECONNECT ? "重新连接" : "发送"
+    );
     lv_obj_set_style_bg_color(
         s_send_panel,
         lv_color_hex(s_send_focused ? UI_YELLOW : UI_PAPER),
@@ -616,11 +625,15 @@ void password_app_handle_button(bsp_btn_t button, bsp_btn_ev_t event)
             if (settings_store_sound_enabled()) password_sound_play_success();
         }
         s_password_display_mode = passport_moonbit_password_display_begin(s_state);
-    } else if (action == ACTION_SEND &&
-               passport_moonbit_ble_keyboard_send_allowed(
-                   s_state, password_ble_keyboard_status()
-               )) {
-        (void)password_ble_keyboard_send(password_platform_output());
+    } else if (action == ACTION_SEND) {
+        int ble_action = passport_moonbit_ble_keyboard_action(
+            s_state, password_ble_keyboard_status()
+        );
+        if (ble_action == BLE_ACTION_RECONNECT) {
+            (void)password_ble_keyboard_resume();
+        } else if (ble_action == BLE_ACTION_SEND) {
+            (void)password_ble_keyboard_send(password_platform_output());
+        }
     }
 
     if (bsp_lvgl_lock(500)) {

@@ -238,6 +238,40 @@ pub fn passport_moonbit_ble_keyboard_retry_ms() -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_ble_keyboard_link_event")
+pub fn passport_moonbit_ble_keyboard_link_event(
+  state : Int,
+  event : Int,
+) -> Int {
+  ble_keyboard_link_event(state, event)
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_link_ready")
+pub fn passport_moonbit_ble_keyboard_link_ready(state : Int) -> Int {
+  if ble_keyboard_link_ready(state) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_link_status")
+pub fn passport_moonbit_ble_keyboard_link_status(state : Int) -> Int {
+  ble_keyboard_link_status(state)
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_action")
+pub fn passport_moonbit_ble_keyboard_action(
+  state : UInt64,
+  status : Int,
+) -> Int {
+  ble_keyboard_action(state, status)
+}
+
+///|
 #export_name("passport_moonbit_generate")
 pub fn passport_moonbit_generate(state : UInt64) -> Int {
   platform_output_reset()

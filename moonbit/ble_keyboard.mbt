@@ -21,14 +21,111 @@ pub let ble_keyboard_sent : Int = 5
 pub let ble_keyboard_error : Int = 6
 
 ///|
+/// Password delivery completed and the HID link was deliberately released so
+/// the phone or computer can restore its own keyboard.
+pub let ble_keyboard_released : Int = 7
+
+///|
 /// The ESP-IDF adapter retries a stopped advertisement at this cadence. The
 /// timing policy lives here so transport recovery stays deterministic and
 /// host-testable.
 pub let ble_keyboard_advertising_retry_ms : Int = 2000
 
 ///|
+/// Raw link events forwarded by the ESP-IDF adapter. MoonBit owns the
+/// reconnect state machine; C only reports what NimBLE observed.
+pub let ble_keyboard_link_connected : Int = 0
+
+///|
+pub let ble_keyboard_link_disconnected : Int = 1
+
+///|
+pub let ble_keyboard_link_encrypted : Int = 2
+
+///|
+pub let ble_keyboard_link_encryption_failed : Int = 3
+
+///|
+pub let ble_keyboard_link_released : Int = 4
+
+///|
+pub let ble_keyboard_link_resumed : Int = 5
+
+///|
+let ble_keyboard_link_connected_mask : Int = 1
+
+///|
+let ble_keyboard_link_encrypted_mask : Int = 2
+
+///|
+let ble_keyboard_link_released_mask : Int = 4
+
+///|
+pub fn ble_keyboard_link_event(state : Int, event : Int) -> Int {
+  match event {
+    0 => state | ble_keyboard_link_connected_mask
+    1 => state & ble_keyboard_link_released_mask
+    2 =>
+      if (state & ble_keyboard_link_connected_mask) != 0 {
+        state | ble_keyboard_link_encrypted_mask
+      } else {
+        state
+      }
+    3 =>
+      state &
+      (ble_keyboard_link_connected_mask | ble_keyboard_link_released_mask)
+    4 => state | ble_keyboard_link_released_mask
+    5 => 0
+    _ => state
+  }
+}
+
+///|
+pub fn ble_keyboard_link_ready(state : Int) -> Bool {
+  (state & ble_keyboard_link_released_mask) == 0 &&
+  (
+    state &
+    (ble_keyboard_link_connected_mask | ble_keyboard_link_encrypted_mask)
+  ) ==
+  (ble_keyboard_link_connected_mask | ble_keyboard_link_encrypted_mask)
+}
+
+///|
+pub fn ble_keyboard_link_status(state : Int) -> Int {
+  if (state & ble_keyboard_link_released_mask) != 0 {
+    ble_keyboard_released
+  } else if (state & ble_keyboard_link_connected_mask) == 0 {
+    ble_keyboard_error
+  } else if ble_keyboard_link_ready(state) {
+    ble_keyboard_connected
+  } else {
+    ble_keyboard_pairing
+  }
+}
+
+///|
 pub fn ble_keyboard_status_normalize(status : Int) -> Int {
-  status.clamp(min=ble_keyboard_starting, max=ble_keyboard_error)
+  status.clamp(min=ble_keyboard_starting, max=ble_keyboard_released)
+}
+
+///|
+pub let ble_keyboard_action_disabled : Int = 0
+
+///|
+pub let ble_keyboard_action_send : Int = 1
+
+///|
+pub let ble_keyboard_action_reconnect : Int = 2
+
+///|
+pub fn ble_keyboard_action(state : UInt64, status : Int) -> Int {
+  if status == ble_keyboard_released {
+    ble_keyboard_action_reconnect
+  } else if ble_keyboard_send_allowed(state, status) {
+    ble_keyboard_action_send
+  } else {
+    ble_keyboard_action_disabled
+  }
 }
 
 ///|
@@ -53,7 +150,8 @@ pub fn ble_keyboard_should_advertise(
 ) -> Bool {
   !connected &&
   !advertising &&
-  ble_keyboard_status_normalize(status) != ble_keyboard_starting
+  ble_keyboard_status_normalize(status) != ble_keyboard_starting &&
+  ble_keyboard_status_normalize(status) != ble_keyboard_released
 }
 
 ///|

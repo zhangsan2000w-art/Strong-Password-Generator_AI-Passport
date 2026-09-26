@@ -75,5 +75,92 @@ test "BLE advertisement recovery only runs while disconnected" {
     ble_keyboard_should_advertise(ble_keyboard_advertising, false, true),
     false,
   )
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_released, false, false),
+    false,
+  )
   @test.assert_eq(ble_keyboard_advertising_retry_ms, 2000)
+}
+
+///|
+test "BLE link becomes ready after encryption and resets on disconnect" {
+  let connected = ble_keyboard_link_event(0, ble_keyboard_link_connected)
+  @test.assert_eq(ble_keyboard_link_status(connected), ble_keyboard_pairing)
+  @test.assert_eq(ble_keyboard_link_ready(connected), false)
+  let encrypted = ble_keyboard_link_event(
+    connected, ble_keyboard_link_encrypted,
+  )
+  @test.assert_eq(ble_keyboard_link_status(encrypted), ble_keyboard_connected)
+  @test.assert_eq(ble_keyboard_link_ready(encrypted), true)
+  let disconnected = ble_keyboard_link_event(
+    encrypted, ble_keyboard_link_disconnected,
+  )
+  @test.assert_eq(ble_keyboard_link_status(disconnected), ble_keyboard_error)
+  @test.assert_eq(ble_keyboard_link_ready(disconnected), false)
+}
+
+///|
+test "BLE link supports reboot reconnect and fresh pairing order" {
+  let first_connection = ble_keyboard_link_event(0, ble_keyboard_link_connected)
+  let first_ready = ble_keyboard_link_event(
+    first_connection, ble_keyboard_link_encrypted,
+  )
+  let disconnected = ble_keyboard_link_event(
+    first_ready, ble_keyboard_link_disconnected,
+  )
+  let reconnected = ble_keyboard_link_event(
+    disconnected, ble_keyboard_link_connected,
+  )
+  @test.assert_eq(ble_keyboard_link_ready(reconnected), false)
+  let restored = ble_keyboard_link_event(
+    reconnected, ble_keyboard_link_encrypted,
+  )
+  @test.assert_eq(ble_keyboard_link_ready(restored), true)
+
+  let released = ble_keyboard_link_event(restored, ble_keyboard_link_released)
+  @test.assert_eq(ble_keyboard_link_status(released), ble_keyboard_released)
+  @test.assert_eq(ble_keyboard_link_ready(released), false)
+  let late_security_failure = ble_keyboard_link_event(
+    released, ble_keyboard_link_encryption_failed,
+  )
+  @test.assert_eq(
+    ble_keyboard_link_status(late_security_failure),
+    ble_keyboard_released,
+  )
+  let released_and_disconnected = ble_keyboard_link_event(
+    released, ble_keyboard_link_disconnected,
+  )
+  @test.assert_eq(
+    ble_keyboard_link_status(released_and_disconnected),
+    ble_keyboard_released,
+  )
+  let resumed = ble_keyboard_link_event(
+    released_and_disconnected, ble_keyboard_link_resumed,
+  )
+  @test.assert_eq(ble_keyboard_link_status(resumed), ble_keyboard_error)
+
+  let ignored = ble_keyboard_link_event(0, ble_keyboard_link_encrypted)
+  @test.assert_eq(ble_keyboard_link_ready(ignored), false)
+  let failed = ble_keyboard_link_event(
+    restored, ble_keyboard_link_encryption_failed,
+  )
+  @test.assert_eq(ble_keyboard_link_status(failed), ble_keyboard_pairing)
+  @test.assert_eq(ble_keyboard_link_ready(failed), false)
+}
+
+///|
+test "BLE action reconnects a released keyboard before sending again" {
+  let generated = record_generation_result(initial_state(), generate_ok)
+  @test.assert_eq(
+    ble_keyboard_action(generated, ble_keyboard_connected),
+    ble_keyboard_action_send,
+  )
+  @test.assert_eq(
+    ble_keyboard_action(generated, ble_keyboard_released),
+    ble_keyboard_action_reconnect,
+  )
+  @test.assert_eq(
+    ble_keyboard_action(initial_state(), ble_keyboard_connected),
+    ble_keyboard_action_disabled,
+  )
 }

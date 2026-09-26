@@ -21,6 +21,12 @@ pub let ble_keyboard_sent : Int = 5
 pub let ble_keyboard_error : Int = 6
 
 ///|
+/// The ESP-IDF adapter retries a stopped advertisement at this cadence. The
+/// timing policy lives here so transport recovery stays deterministic and
+/// host-testable.
+pub let ble_keyboard_advertising_retry_ms : Int = 2000
+
+///|
 pub fn ble_keyboard_status_normalize(status : Int) -> Int {
   status.clamp(min=ble_keyboard_starting, max=ble_keyboard_error)
 }
@@ -34,6 +40,20 @@ pub fn ble_keyboard_send_allowed(state : UInt64, status : Int) -> Bool {
 ///|
 pub fn ble_keyboard_input_allowed(status : Int) -> Bool {
   status != ble_keyboard_sending
+}
+
+///|
+/// A disconnected keyboard must remain discoverable. `advertising` reflects
+/// the NimBLE controller state; the adapter only performs the requested radio
+/// operation.
+pub fn ble_keyboard_should_advertise(
+  status : Int,
+  connected : Bool,
+  advertising : Bool,
+) -> Bool {
+  !connected &&
+  !advertising &&
+  ble_keyboard_status_normalize(status) != ble_keyboard_starting
 }
 
 ///|

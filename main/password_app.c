@@ -297,6 +297,7 @@ static void refresh_password_visibility(lv_timer_t *timer)
 static void refresh_ble(lv_timer_t *timer)
 {
     (void)timer;
+    password_ble_keyboard_poll();
     if (!s_ble_label || !s_send_panel || !s_send_label) return;
 
     int status = passport_moonbit_ble_keyboard_status(

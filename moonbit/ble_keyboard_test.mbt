@@ -52,3 +52,28 @@ test "BLE send requires a generated password and encrypted connection" {
   @test.assert_eq(ble_keyboard_input_allowed(ble_keyboard_connected), true)
   @test.assert_eq(ble_keyboard_input_allowed(ble_keyboard_sending), false)
 }
+
+///|
+test "BLE advertisement recovery only runs while disconnected" {
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_advertising, false, false),
+    true,
+  )
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_error, false, false),
+    true,
+  )
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_starting, false, false),
+    false,
+  )
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_connected, true, false),
+    false,
+  )
+  @test.assert_eq(
+    ble_keyboard_should_advertise(ble_keyboard_advertising, false, true),
+    false,
+  )
+  @test.assert_eq(ble_keyboard_advertising_retry_ms, 2000)
+}

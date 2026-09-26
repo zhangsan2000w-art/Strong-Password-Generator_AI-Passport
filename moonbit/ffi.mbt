@@ -218,6 +218,26 @@ pub fn passport_moonbit_ble_keyboard_input_allowed(status : Int) -> Int {
 }
 
 ///|
+#export_name("passport_moonbit_ble_keyboard_should_advertise")
+pub fn passport_moonbit_ble_keyboard_should_advertise(
+  status : Int,
+  connected : Int,
+  advertising : Int,
+) -> Int {
+  if ble_keyboard_should_advertise(status, connected != 0, advertising != 0) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+#export_name("passport_moonbit_ble_keyboard_retry_ms")
+pub fn passport_moonbit_ble_keyboard_retry_ms() -> Int {
+  ble_keyboard_advertising_retry_ms
+}
+
+///|
 #export_name("passport_moonbit_generate")
 pub fn passport_moonbit_generate(state : UInt64) -> Int {
   platform_output_reset()

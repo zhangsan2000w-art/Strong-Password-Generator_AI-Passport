@@ -18,4 +18,5 @@ typedef enum {
 esp_err_t password_ble_keyboard_init(void);
 esp_err_t password_ble_keyboard_send(const char *password);
 password_ble_status_t password_ble_keyboard_status(void);
+void password_ble_keyboard_poll(void);
 void password_ble_keyboard_reset_feedback(void);

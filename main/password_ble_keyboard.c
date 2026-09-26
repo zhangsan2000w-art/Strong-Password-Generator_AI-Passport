@@ -68,6 +68,8 @@ static volatile password_ble_status_t s_status = PASSWORD_BLE_STARTING;
 static volatile bool s_encrypted;
 static volatile bool s_subscribed;
 static uint8_t s_address_type;
+static bool s_address_ready;
+static TickType_t s_last_advertising_attempt;
 
 void ble_store_config_init(void);
 
@@ -103,6 +105,11 @@ static void update_connection_status(void)
 
 static int start_advertising(void)
 {
+    if (ble_gap_adv_active()) {
+        set_status(PASSWORD_BLE_ADVERTISING);
+        return 0;
+    }
+
     struct ble_hs_adv_fields fields = {0};
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     fields.appearance = ESP_HID_APPEARANCE_KEYBOARD;
@@ -117,7 +124,10 @@ static int start_advertising(void)
     fields.uuids16_is_complete = 1;
 
     int rc = ble_gap_adv_set_fields(&fields);
-    if (rc != 0) return rc;
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to set advertising fields: rc=%d", rc);
+        return rc;
+    }
 
     struct ble_gap_adv_params params = {0};
     params.conn_mode = BLE_GAP_CONN_MODE_UND;
@@ -127,8 +137,25 @@ static int start_advertising(void)
     rc = ble_gap_adv_start(
         s_address_type, NULL, BLE_HS_FOREVER, &params, NULL, NULL
     );
-    if (rc == 0) set_status(PASSWORD_BLE_ADVERTISING);
+    if (rc == 0) {
+        ESP_LOGI(TAG, "Advertising as %s", PASSWORD_BLE_DEVICE_NAME);
+        set_status(PASSWORD_BLE_ADVERTISING);
+    } else {
+        ESP_LOGE(TAG, "Failed to start advertising: rc=%d", rc);
+    }
     return rc;
+}
+
+static int prepare_and_start_advertising(void)
+{
+    if (!s_address_ready) {
+        int rc = ble_hs_util_ensure_addr(0);
+        if (rc != 0) return rc;
+        rc = ble_hs_id_infer_auto(0, &s_address_type);
+        if (rc != 0) return rc;
+        s_address_ready = true;
+    }
+    return start_advertising();
 }
 
 static int gap_event(struct ble_gap_event *event, void *argument)
@@ -142,6 +169,8 @@ static int gap_event(struct ble_gap_event *event, void *argument)
             s_subscribed = false;
             portEXIT_CRITICAL(&s_state_lock);
             set_status(PASSWORD_BLE_PAIRING);
+        } else {
+            set_status(PASSWORD_BLE_ERROR);
         }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
@@ -149,7 +178,10 @@ static int gap_event(struct ble_gap_event *event, void *argument)
         s_encrypted = false;
         s_subscribed = false;
         portEXIT_CRITICAL(&s_state_lock);
-        set_status(PASSWORD_BLE_ADVERTISING);
+        set_status(PASSWORD_BLE_ERROR);
+        break;
+    case BLE_GAP_EVENT_ADV_COMPLETE:
+        set_status(PASSWORD_BLE_ERROR);
         break;
     case BLE_GAP_EVENT_SUBSCRIBE:
         portENTER_CRITICAL(&s_state_lock);
@@ -199,10 +231,12 @@ static void hid_event(
     (void)event_data;
     switch ((esp_hidd_event_t)event_id) {
     case ESP_HIDD_START_EVENT:
-        if (ble_hs_util_ensure_addr(0) != 0 ||
-            ble_hs_id_infer_auto(0, &s_address_type) != 0 ||
-            start_advertising() != 0) {
-            set_status(PASSWORD_BLE_ERROR);
+        {
+            int rc = prepare_and_start_advertising();
+            if (rc != 0) {
+                ESP_LOGE(TAG, "BLE startup failed: rc=%d", rc);
+                set_status(PASSWORD_BLE_ERROR);
+            }
         }
         break;
     case ESP_HIDD_CONNECT_EVENT:
@@ -211,7 +245,9 @@ static void hid_event(
         }
         break;
     case ESP_HIDD_DISCONNECT_EVENT:
-        if (start_advertising() != 0) set_status(PASSWORD_BLE_ERROR);
+        if (!ble_gap_adv_active()) {
+            set_status(PASSWORD_BLE_ERROR);
+        }
         break;
     default:
         break;
@@ -363,6 +399,29 @@ esp_err_t password_ble_keyboard_send(const char *password)
     if (queued != pdTRUE) return ESP_ERR_INVALID_STATE;
     set_status(PASSWORD_BLE_SENDING);
     return ESP_OK;
+}
+
+void password_ble_keyboard_poll(void)
+{
+    if (!s_hid_device) return;
+
+    int connected = esp_hidd_dev_connected(s_hid_device) ? 1 : 0;
+    int advertising = ble_gap_adv_active() ? 1 : 0;
+    if (!passport_moonbit_ble_keyboard_should_advertise(
+            password_ble_keyboard_status(), connected, advertising
+        )) return;
+
+    TickType_t now = xTaskGetTickCount();
+    TickType_t retry_ticks = pdMS_TO_TICKS(
+        passport_moonbit_ble_keyboard_retry_ms()
+    );
+    if (s_last_advertising_attempt != 0 &&
+        now - s_last_advertising_attempt < retry_ticks) return;
+
+    s_last_advertising_attempt = now;
+    if (prepare_and_start_advertising() != 0) {
+        set_status(PASSWORD_BLE_ERROR);
+    }
 }
 
 void password_ble_keyboard_reset_feedback(void)
